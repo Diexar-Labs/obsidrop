@@ -1,10 +1,29 @@
 import { ItemView, Menu, Notice, TFile, WorkspaceLeaf, normalizePath, setIcon } from "obsidian";
 import type DiexarKeepPlugin from "./main";
 import { QuickCaptureModal } from "./capture";
+import { EditNoteModal } from "./edit";
+import {
+  COLOR_LABELS_NL,
+  COLOR_NAMES,
+  ColorName,
+  DEFAULT_META,
+  NoteMeta,
+  readMeta,
+  renderInlinePreviewHtml,
+  stripFrontmatter,
+  updateMeta,
+} from "./metadata";
 
 export const VIEW_TYPE_DIEXAR_KEEP = "diexar-keep-view";
 
 const PREVIEW_MAX_CHARS = 280;
+
+interface CardData {
+  file: TFile;
+  content: string;
+  meta: NoteMeta;
+  archived: boolean;
+}
 
 export class DiexarKeepView extends ItemView {
   plugin: DiexarKeepPlugin;
@@ -49,7 +68,7 @@ export class DiexarKeepView extends ItemView {
     });
     this.searchEl.addEventListener("input", () => {
       this.query = this.searchEl.value.toLowerCase();
-      this.render();
+      void this.render();
     });
 
     this.gridEl = root.createDiv({ cls: "diexar-keep-grid" });
@@ -72,8 +91,10 @@ export class DiexarKeepView extends ItemView {
     this.applyCardWidth();
     this.gridEl.empty();
 
-    const files = this.collectFiles();
-    if (files.length === 0) {
+    const cards = await this.collectCards();
+    const filtered = cards.filter((c) => this.matchesQuery(c));
+
+    if (filtered.length === 0) {
       const empty = this.gridEl.createDiv({ cls: "diexar-keep-empty" });
       empty.createEl("h3", { text: "Nog geen notities" });
       empty.createEl("p", {
@@ -82,18 +103,26 @@ export class DiexarKeepView extends ItemView {
       return;
     }
 
-    for (const file of files) {
-      const content = await this.app.vault.cachedRead(file);
-      if (this.query && !this.matchesQuery(file, content)) continue;
-      this.renderCard(file, content);
+    const pinned = filtered.filter((c) => c.meta.pinned);
+    const rest = filtered.filter((c) => !c.meta.pinned);
+
+    if (pinned.length > 0) {
+      const pinnedSection = this.gridEl.createDiv({ cls: "diexar-keep-section" });
+      pinnedSection.createDiv({ cls: "diexar-keep-section-label", text: "Vastgezet" });
+      const pinnedGrid = pinnedSection.createDiv({ cls: "diexar-keep-grid-inner" });
+      for (const c of pinned) this.renderCard(pinnedGrid, c);
+
+      const restSection = this.gridEl.createDiv({ cls: "diexar-keep-section" });
+      restSection.createDiv({ cls: "diexar-keep-section-label", text: "Overige" });
+      const restGrid = restSection.createDiv({ cls: "diexar-keep-grid-inner" });
+      for (const c of rest) this.renderCard(restGrid, c);
+    } else {
+      const inner = this.gridEl.createDiv({ cls: "diexar-keep-grid-inner" });
+      for (const c of rest) this.renderCard(inner, c);
     }
   }
 
-  private matchesQuery(file: TFile, content: string): boolean {
-    return file.basename.toLowerCase().includes(this.query) || content.toLowerCase().includes(this.query);
-  }
-
-  private collectFiles(): TFile[] {
+  private async collectCards(): Promise<CardData[]> {
     const folder = normalizePath(this.plugin.settings.notesFolder);
     const archive = normalizePath(this.plugin.settings.archiveFolder);
     const showArchived = this.plugin.settings.showArchived;
@@ -106,46 +135,94 @@ export class DiexarKeepView extends ItemView {
       return true;
     });
 
-    return sortFiles(all, this.plugin.settings.sortMode);
+    const sorted = sortFiles(all, this.plugin.settings.sortMode);
+
+    const cards: CardData[] = [];
+    for (const file of sorted) {
+      const content = await this.app.vault.cachedRead(file);
+      const meta = readMeta(this.app, file);
+      cards.push({
+        file,
+        content,
+        meta,
+        archived: isUnder(file.path, archive),
+      });
+    }
+    return cards;
   }
 
-  private renderCard(file: TFile, content: string): void {
-    const archived = isUnder(file.path, normalizePath(this.plugin.settings.archiveFolder));
-    const card = this.gridEl.createDiv({
-      cls: `diexar-keep-card${archived ? " is-archived" : ""}`,
+  private matchesQuery(card: CardData): boolean {
+    if (!this.query) return true;
+    const q = this.query;
+    if (card.file.basename.toLowerCase().includes(q)) return true;
+    if (card.content.toLowerCase().includes(q)) return true;
+    if (card.meta.tags.some((t) => t.toLowerCase().includes(q))) return true;
+    return false;
+  }
+
+  private renderCard(parent: HTMLElement, card: CardData): void {
+    const { file, content, meta, archived } = card;
+    const cardEl = parent.createDiv({
+      cls: `diexar-keep-card${archived ? " is-archived" : ""}${meta.pinned ? " is-pinned" : ""}`,
     });
+    if (meta.color !== "default") {
+      cardEl.dataset.color = meta.color;
+    }
 
     const titleText = extractTitle(content) || file.basename;
     const previewText = extractPreview(content, titleText);
-    const tags = extractTags(content);
 
-    const body = card.createDiv({ cls: "diexar-keep-card-body" });
-    body.addEventListener("click", async () => {
-      await this.app.workspace.getLeaf(false).openFile(file);
+    const body = cardEl.createDiv({ cls: "diexar-keep-card-body" });
+    body.addEventListener("click", () => {
+      new EditNoteModal(this.app, this.plugin, file).open();
     });
 
     body.createEl("h3", { cls: "diexar-keep-card-title", text: titleText });
+
     if (previewText) {
-      body.createDiv({ cls: "diexar-keep-card-preview", text: previewText });
+      const preview = body.createDiv({ cls: "diexar-keep-card-preview" });
+      preview.innerHTML = renderInlinePreviewHtml(previewText);
+      preview.addEventListener("click", (e) => this.handlePreviewClick(e));
     }
 
-    if (tags.length > 0) {
+    if (meta.tags.length > 0) {
       const tagWrap = body.createDiv({ cls: "diexar-keep-card-tags" });
-      for (const tag of tags) {
+      for (const tag of meta.tags) {
         tagWrap.createSpan({ cls: "diexar-keep-card-tag", text: `#${tag}` });
       }
     }
 
-    const actions = card.createDiv({ cls: "diexar-keep-card-actions" });
+    const actions = cardEl.createDiv({ cls: "diexar-keep-card-actions" });
+
+    const pinBtn = actions.createEl("button", {
+      cls: `diexar-keep-card-action${meta.pinned ? " is-active" : ""}`,
+      attr: { "aria-label": meta.pinned ? "Losmaken" : "Vastzetten" },
+    });
+    setIcon(pinBtn, meta.pinned ? "pin-off" : "pin");
+    pinBtn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      await updateMeta(this.app, file, { pinned: !meta.pinned });
+      this.plugin.refreshViews();
+    });
+
+    const colorBtn = actions.createEl("button", {
+      cls: "diexar-keep-card-action",
+      attr: { "aria-label": "Kleur" },
+    });
+    setIcon(colorBtn, "palette");
+    colorBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      this.showColorMenu(e, file, meta.color);
+    });
 
     const editBtn = actions.createEl("button", {
       cls: "diexar-keep-card-action",
       attr: { "aria-label": "Bewerken" },
     });
     setIcon(editBtn, "pencil");
-    editBtn.addEventListener("click", async (e) => {
+    editBtn.addEventListener("click", (e) => {
       e.stopPropagation();
-      await this.app.workspace.getLeaf(false).openFile(file);
+      new EditNoteModal(this.app, this.plugin, file).open();
     });
 
     const archiveBtn = actions.createEl("button", {
@@ -168,6 +245,14 @@ export class DiexarKeepView extends ItemView {
       const menu = new Menu();
       menu.addItem((i) =>
         i
+          .setTitle("Open in nieuw tabblad")
+          .setIcon("file-plus")
+          .onClick(async () => {
+            await this.app.workspace.getLeaf("tab").openFile(file);
+          })
+      );
+      menu.addItem((i) =>
+        i
           .setTitle("Verwijder kaartje")
           .setIcon("trash-2")
           .onClick(async () => {
@@ -176,16 +261,40 @@ export class DiexarKeepView extends ItemView {
             this.plugin.refreshViews();
           })
       );
-      menu.addItem((i) =>
-        i
-          .setTitle("Open in nieuw tabblad")
-          .setIcon("file-plus")
-          .onClick(async () => {
-            await this.app.workspace.getLeaf("tab").openFile(file);
-          })
-      );
       menu.showAtMouseEvent(e);
     });
+  }
+
+  private handlePreviewClick(e: MouseEvent): void {
+    const target = e.target as HTMLElement;
+    const link = target.closest(".diexar-keep-wikilink") as HTMLElement | null;
+    if (!link) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const href = link.dataset.href;
+    if (!href) return;
+    const dest = this.app.metadataCache.getFirstLinkpathDest(href, "");
+    if (dest) {
+      void this.app.workspace.getLeaf(false).openFile(dest);
+    } else {
+      new Notice(`Geen notitie gevonden: ${href}`);
+    }
+  }
+
+  private showColorMenu(event: MouseEvent, file: TFile, current: ColorName): void {
+    const menu = new Menu();
+    for (const name of COLOR_NAMES) {
+      menu.addItem((i) =>
+        i
+          .setTitle(COLOR_LABELS_NL[name])
+          .setIcon(name === current ? "check" : "circle")
+          .onClick(async () => {
+            await updateMeta(this.app, file, { color: name });
+            this.plugin.refreshViews();
+          }),
+      );
+    }
+    menu.showAtMouseEvent(event);
   }
 
   private async toggleArchive(file: TFile, currentlyArchived: boolean): Promise<void> {
@@ -242,21 +351,21 @@ function sortFiles(files: TFile[], mode: string): TFile[] {
 }
 
 function extractTitle(content: string): string {
-  const lines = content.split("\n");
+  const body = stripFrontmatter(content);
+  const lines = body.split("\n");
   for (const raw of lines) {
     const line = raw.trim();
     if (!line) continue;
-    if (line.startsWith("---")) continue;
     return line.replace(/^#+\s*/, "").replace(/^[*_`>]+/, "").trim().slice(0, 80);
   }
   return "";
 }
 
 function extractPreview(content: string, title: string): string {
-  const stripped = content.replace(/^---[\s\S]*?---\n?/, "");
-  const lines = stripped.split("\n").map((l) => l.trim()).filter(Boolean);
+  const body = stripFrontmatter(content);
+  const lines = body.split("\n").map((l) => l.trim()).filter(Boolean);
   const startIdx = lines[0] && stripFirstHeading(lines[0]) === title.trim() ? 1 : 0;
-  const rest = lines.slice(startIdx).join(" ");
+  const rest = lines.slice(startIdx).join("\n");
   if (!rest) return "";
   return rest.length > PREVIEW_MAX_CHARS ? `${rest.slice(0, PREVIEW_MAX_CHARS)}…` : rest;
 }
@@ -265,8 +374,5 @@ function stripFirstHeading(line: string): string {
   return line.replace(/^#+\s*/, "").trim();
 }
 
-function extractTags(content: string): string[] {
-  const matches = content.match(/(?:^|\s)#([A-Za-z0-9_\-/]+)/g) ?? [];
-  const cleaned = matches.map((m) => m.trim().replace(/^#/, ""));
-  return Array.from(new Set(cleaned)).slice(0, 8);
-}
+// Houden voor backwards-compat in case main.ts importeerde dit. Niet meer gebruikt.
+export { DEFAULT_META };

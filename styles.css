@@ -59,11 +59,71 @@
   outline-offset: 1px;
 }
 
-/* Masonry-achtig grid via CSS columns */
+.diexar-keep-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.diexar-keep-section-label {
+  font-size: 0.75em;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  font-weight: 600;
+  padding: 0 4px;
+}
+
 .diexar-keep-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Masonry-achtig grid via CSS columns */
+.diexar-keep-grid-inner {
   --diexar-keep-card-width: 240px;
   column-width: var(--diexar-keep-card-width);
   column-gap: 12px;
+}
+
+/* Kleurpalet — light mode defaults */
+.diexar-keep-card {
+  --kc-bg: var(--background-secondary);
+  --kc-border: var(--background-modifier-border);
+}
+.diexar-keep-card[data-color="red"]    { --kc-bg: #FAAFA8; --kc-border: #E7948C; }
+.diexar-keep-card[data-color="orange"] { --kc-bg: #F39F76; --kc-border: #DC8559; }
+.diexar-keep-card[data-color="yellow"] { --kc-bg: #FFF8B8; --kc-border: #E7DC8E; }
+.diexar-keep-card[data-color="green"]  { --kc-bg: #E2F6D3; --kc-border: #BCDDA5; }
+.diexar-keep-card[data-color="teal"]   { --kc-bg: #B4DDD3; --kc-border: #8AC1B4; }
+.diexar-keep-card[data-color="blue"]   { --kc-bg: #D4E4ED; --kc-border: #ABC4D2; }
+.diexar-keep-card[data-color="purple"] { --kc-bg: #D3BFDB; --kc-border: #B499BF; }
+.diexar-keep-card[data-color="pink"]   { --kc-bg: #F6E2DD; --kc-border: #E3BBB1; }
+.diexar-keep-card[data-color="brown"]  { --kc-bg: #E9E3D4; --kc-border: #CCC0A4; }
+.diexar-keep-card[data-color="gray"]   { --kc-bg: #EFEFF1; --kc-border: #CDCDD1; }
+
+/* Donkere modus — vergelijkbaar met Google Keep dark */
+.theme-dark .diexar-keep-card[data-color="red"]    { --kc-bg: #5C2B29; --kc-border: #7A3A37; }
+.theme-dark .diexar-keep-card[data-color="orange"] { --kc-bg: #614A19; --kc-border: #8A6F2C; }
+.theme-dark .diexar-keep-card[data-color="yellow"] { --kc-bg: #635D19; --kc-border: #8B842B; }
+.theme-dark .diexar-keep-card[data-color="green"]  { --kc-bg: #345920; --kc-border: #4F7B36; }
+.theme-dark .diexar-keep-card[data-color="teal"]   { --kc-bg: #16504D; --kc-border: #26706C; }
+.theme-dark .diexar-keep-card[data-color="blue"]   { --kc-bg: #2D555E; --kc-border: #437686; }
+.theme-dark .diexar-keep-card[data-color="purple"] { --kc-bg: #42275E; --kc-border: #61417F; }
+.theme-dark .diexar-keep-card[data-color="pink"]   { --kc-bg: #5B2A4F; --kc-border: #7C3D6E; }
+.theme-dark .diexar-keep-card[data-color="brown"]  { --kc-bg: #442F19; --kc-border: #65472B; }
+.theme-dark .diexar-keep-card[data-color="gray"]   { --kc-bg: #3C3F43; --kc-border: #585B5F; }
+
+.theme-dark .diexar-keep-card[data-color]:not([data-color="default"]) {
+  color: #fff;
+}
+.diexar-keep-card[data-color]:not([data-color="default"]) {
+  color: #1f1f1f;
+}
+.diexar-keep-card[data-color]:not([data-color="default"]) .diexar-keep-card-title,
+.diexar-keep-card[data-color]:not([data-color="default"]) .diexar-keep-card-preview {
+  color: inherit;
 }
 
 .diexar-keep-card {
@@ -72,21 +132,29 @@
   width: 100%;
   margin: 0 0 12px;
   padding: 12px 14px;
-  background: var(--background-secondary);
-  border: 1px solid var(--background-modifier-border);
+  background: var(--kc-bg);
+  border: 1px solid var(--kc-border);
   border-radius: 10px;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
   transition: box-shadow 0.15s ease, transform 0.15s ease, border-color 0.15s ease;
+  position: relative;
 }
 
 .diexar-keep-card:hover {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
-  border-color: var(--background-modifier-border-hover);
 }
 
 .diexar-keep-card.is-archived {
   opacity: 0.7;
-  background: var(--background-secondary-alt);
+}
+
+.diexar-keep-card.is-pinned::before {
+  content: "📌";
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.9em;
+  opacity: 0.85;
 }
 
 .diexar-keep-card-body {
@@ -111,6 +179,19 @@
   overflow: hidden;
 }
 
+.diexar-keep-wikilink {
+  color: var(--text-accent);
+  text-decoration: underline;
+  text-decoration-style: dashed;
+  cursor: pointer;
+}
+
+.diexar-keep-card[data-color]:not([data-color="default"]) .diexar-keep-wikilink {
+  color: inherit;
+  text-decoration-style: solid;
+  font-weight: 600;
+}
+
 .diexar-keep-card-tags {
   display: flex;
   flex-wrap: wrap;
@@ -122,6 +203,15 @@
   font-size: 0.75em;
   padding: 2px 8px;
   border-radius: 999px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+
+.theme-dark .diexar-keep-card-tag {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.diexar-keep-card[data-color="default"] .diexar-keep-card-tag {
   background: var(--background-modifier-hover);
   color: var(--text-accent);
 }
@@ -131,13 +221,22 @@
   gap: 4px;
   margin-top: 10px;
   padding-top: 8px;
-  border-top: 1px dashed var(--background-modifier-border);
+  border-top: 1px dashed rgba(0, 0, 0, 0.15);
   opacity: 0;
   transition: opacity 0.15s ease;
 }
 
+.theme-dark .diexar-keep-card-actions {
+  border-top-color: rgba(255, 255, 255, 0.15);
+}
+
+.diexar-keep-card[data-color="default"] .diexar-keep-card-actions {
+  border-top-color: var(--background-modifier-border);
+}
+
 .diexar-keep-card:hover .diexar-keep-card-actions,
-.diexar-keep-card:focus-within .diexar-keep-card-actions {
+.diexar-keep-card:focus-within .diexar-keep-card-actions,
+.diexar-keep-card.is-pinned .diexar-keep-card-actions {
   opacity: 1;
 }
 
@@ -146,16 +245,26 @@
   border: none;
   padding: 4px;
   border-radius: 6px;
-  color: var(--text-muted);
+  color: inherit;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  opacity: 0.6;
 }
 
 .diexar-keep-card-action:hover {
-  background: var(--background-modifier-hover);
-  color: var(--text-normal);
+  background: rgba(0, 0, 0, 0.08);
+  opacity: 1;
+}
+
+.theme-dark .diexar-keep-card-action:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.diexar-keep-card-action.is-active {
+  opacity: 1;
+  color: var(--text-accent);
 }
 
 .diexar-keep-empty {
@@ -171,6 +280,159 @@
 
 /* Quick capture modal */
 
+.diexar-keep-capture-controls,
+.diexar-keep-edit-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.diexar-keep-edit-label {
+  font-size: 0.8em;
+  color: var(--text-muted);
+  min-width: 40px;
+}
+
+.diexar-keep-edit-colorrow,
+.diexar-keep-edit-tagrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diexar-keep-edit-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.diexar-keep-edit-swatches {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.diexar-keep-edit-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  cursor: pointer;
+  border: 2px solid transparent;
+  background: var(--background-secondary);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.diexar-keep-edit-swatch:hover { transform: scale(1.15); }
+.diexar-keep-edit-swatch.is-active {
+  border-color: var(--text-normal);
+  box-shadow: 0 0 0 2px var(--background-primary), 0 0 0 4px var(--text-normal);
+}
+.diexar-keep-edit-swatch-check {
+  font-size: 14px;
+  font-weight: bold;
+  color: #111;
+  text-shadow: 0 0 2px #fff, 0 0 2px #fff;
+  line-height: 1;
+  pointer-events: none;
+}
+.diexar-keep-edit-swatch[data-color="red"]    { background: #FAAFA8; }
+.diexar-keep-edit-swatch[data-color="orange"] { background: #F39F76; }
+.diexar-keep-edit-swatch[data-color="yellow"] { background: #FFF8B8; }
+.diexar-keep-edit-swatch[data-color="green"]  { background: #E2F6D3; }
+.diexar-keep-edit-swatch[data-color="teal"]   { background: #B4DDD3; }
+.diexar-keep-edit-swatch[data-color="blue"]   { background: #D4E4ED; }
+.diexar-keep-edit-swatch[data-color="purple"] { background: #D3BFDB; }
+.diexar-keep-edit-swatch[data-color="pink"]   { background: #F6E2DD; }
+.diexar-keep-edit-swatch[data-color="brown"]  { background: #E9E3D4; }
+.diexar-keep-edit-swatch[data-color="gray"]   { background: #EFEFF1; }
+.diexar-keep-edit-swatch[data-color="default"] {
+  background: linear-gradient(135deg, var(--background-secondary) 50%, var(--background-modifier-border) 50%);
+}
+
+.diexar-keep-edit-pin,
+.diexar-keep-edit-linkbtn {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.diexar-keep-edit-pin.is-active {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.diexar-keep-edit-pin:hover,
+.diexar-keep-edit-linkbtn:hover {
+  background: var(--background-modifier-hover);
+}
+
+.diexar-keep-edit-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.diexar-keep-edit-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--background-modifier-hover);
+  font-size: 0.85em;
+}
+
+.diexar-keep-edit-chip-x {
+  cursor: pointer;
+  opacity: 0.6;
+  font-weight: bold;
+}
+.diexar-keep-edit-chip-x:hover {
+  opacity: 1;
+}
+
+.diexar-keep-edit-taginput {
+  flex: 1;
+  min-width: 120px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+}
+
+.diexar-keep-edit-body {
+  width: 100%;
+  min-height: 220px;
+  resize: vertical;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 0.95em;
+  line-height: 1.5;
+}
+
+.diexar-keep-edit-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+}
+
 .diexar-keep-capture-textarea {
   width: 100%;
   min-height: 160px;
@@ -185,16 +447,24 @@
   line-height: 1.5;
 }
 
-.diexar-keep-capture-textarea:focus {
+.diexar-keep-capture-textarea:focus,
+.diexar-keep-edit-body:focus,
+.diexar-keep-edit-taginput:focus {
   outline: 2px solid var(--interactive-accent);
   outline-offset: 1px;
 }
 
 .diexar-keep-capture-footer {
   display: flex;
-  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
   gap: 8px;
   margin-top: 12px;
+}
+
+.diexar-keep-capture-buttons {
+  display: flex;
+  gap: 8px;
 }
 
 .diexar-keep-capture-hint {
@@ -202,9 +472,14 @@
   color: var(--text-muted);
 }
 
+.diexar-keep-suggest-path {
+  font-size: 0.75em;
+  color: var(--text-muted);
+}
+
 /* Smal scherm: minder kolombreedte */
 @media (max-width: 480px) {
-  .diexar-keep-grid {
+  .diexar-keep-grid-inner {
     --diexar-keep-card-width: 100%;
   }
   .diexar-keep-card-actions {

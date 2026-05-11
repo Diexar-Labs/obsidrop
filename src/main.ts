@@ -5,6 +5,7 @@ import { QuickCaptureModal } from "./capture";
 
 export default class DiexarKeepPlugin extends Plugin {
   settings!: DiexarKeepSettings;
+  private refreshTimer: number | null = null;
 
   async onload(): Promise<void> {
     await this.loadSettings();
@@ -65,12 +66,18 @@ export default class DiexarKeepPlugin extends Plugin {
   }
 
   refreshViews(): void {
-    const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DIEXAR_KEEP);
-    for (const leaf of leaves) {
-      const view = leaf.view;
-      if (view instanceof DiexarKeepView) {
-        void view.render();
-      }
+    if (this.refreshTimer != null) {
+      window.clearTimeout(this.refreshTimer);
     }
+    this.refreshTimer = window.setTimeout(() => {
+      this.refreshTimer = null;
+      const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_DIEXAR_KEEP);
+      for (const leaf of leaves) {
+        const view = leaf.view;
+        if (view instanceof DiexarKeepView) {
+          void view.render();
+        }
+      }
+    }, 150);
   }
 }
