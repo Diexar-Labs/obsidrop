@@ -11,8 +11,23 @@ android {
         applicationId = "com.diexar.keepcapture"
         minSdk = 26
         targetSdk = 34
-        versionCode = 28
-        versionName = "0.15.2"
+        versionCode = 29
+        versionName = "0.15.3"
+    }
+
+    // Stabiele debug-keystore in de repo. AGP's default genereert per CI-runner
+    // een nieuwe keystore, waardoor opeenvolgende releases verschillende
+    // signatures hebben en Android weigert ze over elkaar te installeren
+    // ("App not installed"). Met deze gecommite keystore krijgt elke release
+    // dezelfde signature en updaten APK's gewoon netjes over elkaar heen.
+    // Veilig om te committen: het is debug-signing, geen productie-key.
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
     }
 
     buildTypes {
@@ -22,6 +37,7 @@ android {
         }
         debug {
             isDebuggable = true
+            signingConfig = signingConfigs.getByName("debug")
         }
     }
 
