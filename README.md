@@ -81,7 +81,7 @@ For each: use a real-looking dataset (no Lorem Ipsum), warm lighting, no system 
 
 ## Install
 
-> **For your friends:** grab the files from the [latest release](https://github.com/Diexar-Labs/obsidrop/releases/latest), drop them in the right place, done. No build tools needed.
+> **TL;DR:** grab the files from the [latest release](https://github.com/Diexar-Labs/obsidrop/releases/latest), drop them in the right place, done. No build tools needed.
 
 ### Obsidian plugin (desktop + mobile)
 
