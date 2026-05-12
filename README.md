@@ -62,7 +62,7 @@ For each: use a real-looking dataset (no Lorem Ipsum), warm lighting, no system 
 - **Link previews** (Open Graph) - paste a URL, get a card with title, image, and source
 
 ### Organize
-- **Colors** (12 swatches, colorblind-friendly labels)
+- **Colors** (11 swatches, colorblind-friendly labels)
 - **Tags** - typed inline or picked from existing
 - **Archive** with one tap, restore anytime
 - **Pinned** notes float to the top
@@ -81,7 +81,7 @@ For each: use a real-looking dataset (no Lorem Ipsum), warm lighting, no system 
 
 ## Install
 
-> **For your friends:** download the two files, drop them in the right folder, done. No build tools needed.
+> **For your friends:** grab the files from the [latest release](https://github.com/Diexar-Labs/obsidrop/releases/latest), drop them in the right place, done. No build tools needed.
 
 ### Obsidian plugin (desktop + mobile)
 
@@ -89,7 +89,7 @@ For each: use a real-looking dataset (no Lorem Ipsum), warm lighting, no system 
 2. Download `manifest.json`, `main.js`, and `styles.css`.
 3. Put them in `<your-vault>/.obsidian/plugins/obsidrop/` (create the folder if it doesn't exist).
 4. Open Obsidian → Settings → Community plugins → enable **ObsiDrop**.
-5. Click the leaf-icon in the left ribbon (or run command "ObsiDrop: Open view").
+5. Click the sticky-note icon in the left ribbon (or run command "ObsiDrop: Open Keep view").
 
 ### Android app
 
@@ -157,7 +157,7 @@ Open source, MIT-licensed, no premium tiers. If ObsiDrop saves you time and you 
 &nbsp;
 <!-- GitHub Sponsors badge will be added once approval is in -->
 
-No subscriptions, no obligations, no DMs. Total optional.
+No subscriptions, no obligations, no DMs. Totally optional.
 
 ## Build from source
 
@@ -173,11 +173,11 @@ npm run build
 **Android:**
 ```bash
 cd android
-./gradlew :app:assembleDebug
+gradle :app:assembleDebug
 # APK at android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-Requires JDK 17 and Android SDK 34.
+Requires JDK 17, Android SDK 34, and Gradle 8.7 (the wrapper jar isn't committed - either install Gradle system-wide or run `gradle wrapper` once to generate `./gradlew`).
 
 ## Credits
 
