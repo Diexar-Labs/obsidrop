@@ -3,6 +3,9 @@ package com.diexar.keepcapture
 import android.content.Context
 import android.net.Uri
 import androidx.documentfile.provider.DocumentFile
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -18,8 +21,10 @@ data class OgPreview(
 
 object OgFetcher {
 
+    // Desktop Chrome — Cloudflare/WAF-stacks scoren mobile UA's hoger als bot
+    // dan desktop, dus desktop voorop is bewust. Spiegel van de plugin-kant.
     private const val USER_AGENT =
-        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.71 Mobile Safari/537.36"
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Safari/537.36"
     // Crawler-UAs: nieuwsites met cookie-walls (Telegraaf e.d.) serveren OG-meta wél aan
     // bekende social-media-crawlers, zodat hun shares op FB/Twitter netjes embedden.
     // Twitterbot komt eerst omdat Telegraaf zelfs Googlebot/FB 403't, maar Twitterbot toelaat.
@@ -88,28 +93,25 @@ object OgFetcher {
             // die wél nette OG-meta serveert (gebruikt door Discord/Telegram embeds).
             val fetchUrl = rewriteForScraping(url)
 
-            // Probeer eerst met Chrome-Android UA. Als dat een 4xx geeft (Telegraaf 403't bv.)
-            // óf geen og:image levert (cookie-wall HTML), retry met crawler-UAs in volgorde.
-            var html: String? = downloadHtml(fetchUrl, USER_AGENT).getOrNull()
-            var rawImageUrl: String? = html?.let { findOgImage(it) }
+            // Probeer eerst met Chrome desktop UA. Als dat een 4xx geeft (Telegraaf 403't bv.)
+            // óf geen image-kandidaten levert (cookie-wall HTML), retry met crawler-UAs in volgorde.
+            var html: String? = null
+            var rawImageCandidates: List<String> = emptyList()
             var lastError: Throwable? = null
 
-            if (rawImageUrl == null) {
-                for (ua in FALLBACK_UAS) {
-                    val attempt = downloadHtml(fetchUrl, ua)
-                    val attemptHtml = attempt.getOrNull()
-                    if (attemptHtml == null) {
-                        lastError = attempt.exceptionOrNull()
-                        continue
-                    }
-                    val attemptImage = findOgImage(attemptHtml)
-                    if (attemptImage != null) {
-                        html = attemptHtml
-                        rawImageUrl = attemptImage
-                        break
-                    }
-                    // Houd in elk geval bruikbare HTML vast voor titel/beschrijving.
-                    if (html == null) html = attemptHtml
+            for (ua in listOf(USER_AGENT) + FALLBACK_UAS) {
+                val attempt = downloadHtml(fetchUrl, ua)
+                val attemptHtml = attempt.getOrNull()
+                if (attemptHtml == null) {
+                    lastError = attempt.exceptionOrNull()
+                    continue
+                }
+                if (html == null) html = attemptHtml
+                val candidates = findOgImageCandidates(attemptHtml, fetchUrl)
+                if (candidates.isNotEmpty()) {
+                    html = attemptHtml
+                    rawImageCandidates = candidates
+                    break
                 }
             }
 
@@ -123,11 +125,19 @@ object OgFetcher {
             val description = extractMeta(html, "og:description")
                 ?: extractMeta(html, "twitter:description")
                 ?: extractMeta(html, "description")
-            val imageUrl = rawImageUrl?.let { absolutize(it, fetchUrl) }
 
-            val imageBasename = if (imageUrl != null) {
-                downloadImage(context, imageUrl).getOrNull()
-            } else null
+            // Probeer elke kandidaat tot er één daadwerkelijk downloadbaar is.
+            // Hola Gestoría heeft bijvoorbeeld een og:image die 404't — dan vallen
+            // we automatisch terug op apple-touch-icon of body-img.
+            var imageBasename: String? = null
+            for (candidate in rawImageCandidates) {
+                val absolute = absolutize(candidate, fetchUrl)
+                val basename = downloadImage(context, absolute).getOrNull()
+                if (basename != null) {
+                    imageBasename = basename
+                    break
+                }
+            }
 
             Result.success(
                 OgPreview(
@@ -142,12 +152,153 @@ object OgFetcher {
         }
     }
 
-    private fun findOgImage(html: String): String? {
-        return extractMeta(html, "og:image")
-            ?: extractMeta(html, "og:image:url")
-            ?: extractMeta(html, "twitter:image")
-            ?: extractMeta(html, "twitter:image:src")
-            ?: extractLinkImageSrc(html)
+    /**
+     * Verzamelt álle image-kandidaten in prioriteitsvolgorde. Sites zetten soms
+     * een `og:image` die 404't (zie holagestoria.es) — we vallen dan terug op
+     * twitter:image, JSON-LD, apple-touch-icon en als allerlaatste een
+     * same-site `<img>` uit de body. Spiegel van de plugin-keten.
+     */
+    private fun findOgImageCandidates(html: String, pageUrl: String): List<String> {
+        val sources = listOfNotNull(
+            extractMeta(html, "og:image"),
+            extractMeta(html, "og:image:url"),
+            extractMeta(html, "og:image:secure_url"),
+            extractMeta(html, "twitter:image"),
+            extractMeta(html, "twitter:image:src"),
+            extractLinkImageSrc(html),
+            extractJsonLdImage(html),
+            extractAppleTouchIcon(html),
+            extractFirstBodyImage(html, pageUrl),
+        )
+        val seen = mutableSetOf<String>()
+        return sources.filter { it.isNotEmpty() && seen.add(it) }
+    }
+
+    /**
+     * Schema.org JSON-LD-blokken kunnen een `image`-veld bevatten — string,
+     * object met `url`, of array van een van beide. We wandelen de boom
+     * recursief af tot de eerste string-URL.
+     */
+    private fun extractJsonLdImage(html: String): String? {
+        val scriptRe = Regex(
+            """<script[^>]+type\s*=\s*["']application/ld\+json["'][^>]*>([\s\S]*?)</script>""",
+            RegexOption.IGNORE_CASE,
+        )
+        for (match in scriptRe.findAll(html)) {
+            val payload = match.groupValues[1].trim()
+            if (payload.isEmpty()) continue
+            val found = try {
+                when {
+                    payload.startsWith("{") -> walkJsonLdImage(JSONObject(payload))
+                    payload.startsWith("[") -> walkJsonLdImage(JSONArray(payload))
+                    else -> null
+                }
+            } catch (_: JSONException) {
+                null
+            }
+            if (found != null) return found
+        }
+        return null
+    }
+
+    private fun walkJsonLdImage(node: Any?): String? {
+        when (node) {
+            is JSONArray -> {
+                for (i in 0 until node.length()) {
+                    val found = walkJsonLdImage(node.opt(i))
+                    if (found != null) return found
+                }
+            }
+            is JSONObject -> {
+                val image = node.opt("image")
+                when (image) {
+                    is String -> if (image.isNotBlank()) return image
+                    is JSONObject -> {
+                        val url = image.optString("url", "")
+                        if (url.isNotBlank()) return url
+                    }
+                    is JSONArray -> {
+                        for (i in 0 until image.length()) {
+                            when (val item = image.opt(i)) {
+                                is String -> if (item.isNotBlank()) return item
+                                is JSONObject -> {
+                                    val url = item.optString("url", "")
+                                    if (url.isNotBlank()) return url
+                                }
+                            }
+                        }
+                    }
+                }
+                val keys = node.keys()
+                while (keys.hasNext()) {
+                    val key = keys.next()
+                    if (key == "image") continue
+                    val found = walkJsonLdImage(node.opt(key))
+                    if (found != null) return found
+                }
+            }
+        }
+        return null
+    }
+
+    /**
+     * Apple-touch-icon — WordPress genereert die standaard op 180x180, dus nog
+     * acceptabel als card-thumbnail. Beter dan een lege kaart.
+     */
+    private fun extractAppleTouchIcon(html: String): String? {
+        val p1 = Regex(
+            """<link[^>]+?rel\s*=\s*["']apple-touch-icon(?:-precomposed)?["'][^>]*?href\s*=\s*["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        val p2 = Regex(
+            """<link[^>]+?href\s*=\s*["']([^"']+)["'][^>]*?rel\s*=\s*["']apple-touch-icon(?:-precomposed)?["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        val match = p1.find(html) ?: p2.find(html)
+        return match?.groupValues?.getOrNull(1)?.let { decodeHtmlEntities(it).trim().takeIf { s -> s.isNotEmpty() } }
+    }
+
+    /**
+     * Allerlaatste redmiddel: eerste niet-triviale `<img>` uit de body.
+     * Filtert third-party widgets (Google-login, FB-pixel) op same-site domein.
+     */
+    private fun extractFirstBodyImage(html: String, pageUrl: String): String? {
+        val bodyMatch = Regex("""<body\b[\s\S]*$""", RegexOption.IGNORE_CASE).find(html)
+        val body = bodyMatch?.value ?: html
+        val imgRe = Regex(
+            """<img\b[^>]*?(?:data-src|data-lazy-src|src)\s*=\s*["']([^"']+)["']""",
+            RegexOption.IGNORE_CASE,
+        )
+        for (m in imgRe.findAll(body)) {
+            val src = decodeHtmlEntities(m.groupValues[1]).trim()
+            if (src.isEmpty()) continue
+            if (src.startsWith("data:")) continue
+            if (Regex("""\.svg(\?|#|$)""", RegexOption.IGNORE_CASE).containsMatchIn(src)) continue
+            if (Regex("""\b(spinner|loader|placeholder|pixel|tracking|spacer|blank|transparent)\b""", RegexOption.IGNORE_CASE).containsMatchIn(src)) continue
+            if (Regex("""\b1x1\b|\b1px\b""", RegexOption.IGNORE_CASE).containsMatchIn(src)) continue
+            if (!isSameSite(src, pageUrl)) continue
+            return src
+        }
+        return null
+    }
+
+    /**
+     * Same-site check voor de body-img scrape. Relatieve URL's zijn per
+     * definitie same-site. Voor absolute URL's vergelijken we hostnames met
+     * `www.`-prefix gestript, subdomeinen worden geaccepteerd.
+     */
+    private fun isSameSite(imageSrc: String, pageUrl: String): Boolean {
+        if (!Regex("""^https?://""", RegexOption.IGNORE_CASE).containsMatchIn(imageSrc)) return true
+        return try {
+            val strip: (String) -> String = { it.lowercase().removePrefix("www.") }
+            val imgHost = strip(URL(imageSrc).host)
+            val pageHost = strip(URL(pageUrl).host)
+            imgHost == pageHost ||
+                imgHost.endsWith(".$pageHost") ||
+                pageHost.endsWith(".$imgHost")
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
@@ -172,6 +323,39 @@ object OgFetcher {
         }
     }
 
+    /**
+     * Chrome-fingerprint headers — sobere requests (alleen UA + Accept) worden
+     * door Cloudflare/WAF-stacks geweigerd met 403 nog vóór de bytes worden
+     * geserveerd. Met de volledige sec-ch-ua/sec-fetch-set passeren we de
+     * default-bot-regels. Gebruikt door zowel HTML-scrapes als image-downloads.
+     */
+    private fun applyBrowserHeaders(
+        conn: HttpURLConnection,
+        userAgent: String,
+        accept: String,
+        secFetchDest: String,
+    ) {
+        conn.setRequestProperty("User-Agent", userAgent)
+        conn.setRequestProperty("Accept", accept)
+        conn.setRequestProperty("Accept-Language", "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7")
+        conn.setRequestProperty("Referer", "https://www.google.com/")
+        if (secFetchDest == "document") {
+            conn.setRequestProperty("Upgrade-Insecure-Requests", "1")
+        }
+        val isChrome = userAgent.contains("Chrome/") && !userAgent.contains("Googlebot")
+        if (isChrome) {
+            conn.setRequestProperty("sec-ch-ua", "\"Not/A)Brand\";v=\"8\", \"Chromium\";v=\"126\", \"Google Chrome\";v=\"126\"")
+            conn.setRequestProperty("sec-ch-ua-mobile", "?0")
+            conn.setRequestProperty("sec-ch-ua-platform", "\"Windows\"")
+            conn.setRequestProperty("sec-fetch-dest", secFetchDest)
+            conn.setRequestProperty("sec-fetch-mode", if (secFetchDest == "document") "navigate" else "no-cors")
+            conn.setRequestProperty("sec-fetch-site", "cross-site")
+            if (secFetchDest == "document") {
+                conn.setRequestProperty("sec-fetch-user", "?1")
+            }
+        }
+    }
+
     private fun downloadHtml(urlString: String, userAgent: String = USER_AGENT): Result<String> {
         val url = URL(urlString)
         val conn = (url.openConnection() as HttpURLConnection).apply {
@@ -179,10 +363,13 @@ object OgFetcher {
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", userAgent)
-            setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
-            setRequestProperty("Accept-Language", "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7")
         }
+        applyBrowserHeaders(
+            conn,
+            userAgent,
+            "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "document",
+        )
         return try {
             val code = conn.responseCode
             if (code !in 200..299) {
@@ -222,9 +409,13 @@ object OgFetcher {
             connectTimeout = CONNECT_TIMEOUT_MS
             readTimeout = READ_TIMEOUT_MS
             instanceFollowRedirects = true
-            setRequestProperty("User-Agent", USER_AGENT)
-            setRequestProperty("Accept", "image/*")
         }
+        applyBrowserHeaders(
+            conn,
+            USER_AGENT,
+            "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+            "image",
+        )
         return try {
             val code = conn.responseCode
             if (code !in 200..299) {

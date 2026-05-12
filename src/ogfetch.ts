@@ -11,8 +11,10 @@ import { App, normalizePath, requestUrl } from "obsidian";
  * deduplicates automatisch en de plugin's display-flow vindt de file.
  */
 
+// Desktop Chrome — Cloudflare/WAF-stacks tweaken bot-scores hoger op mobile UA's
+// dan op desktop, dus desktop voorop is bewust.
 const CHROME_UA =
-  "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.71 Mobile Safari/537.36";
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Safari/537.36";
 
 // Volgorde matters: Telegraaf 403't iedereen behalve Twitterbot.
 const FALLBACK_UAS = [
@@ -53,24 +55,29 @@ export async function fetchOg(
     }
     const fetchUrl = rewriteForScraping(url);
 
-    let html = await downloadHtml(fetchUrl, CHROME_UA);
-    let rawImageUrl = html ? findOgImage(html) : null;
+    let html: string | null = null;
+    let rawImageCandidates: string[] = [];
+    const errors: string[] = [];
 
-    if (rawImageUrl == null) {
-      for (const ua of FALLBACK_UAS) {
-        const attempt = await downloadHtml(fetchUrl, ua);
-        if (!attempt) continue;
-        const img = findOgImage(attempt);
-        if (img) {
-          html = attempt;
-          rawImageUrl = img;
-          break;
-        }
-        if (!html) html = attempt;
+    for (const ua of [CHROME_UA, ...FALLBACK_UAS]) {
+      const attempt = await downloadHtml(fetchUrl, ua);
+      if ("error" in attempt) {
+        errors.push(`${ua.split(/[\s\/]/)[0]}=${attempt.error}`);
+        continue;
+      }
+      if (!html) html = attempt.html;
+      const candidates = findOgImageCandidates(attempt.html, fetchUrl);
+      if (candidates.length > 0) {
+        html = attempt.html;
+        rawImageCandidates = candidates;
+        break;
       }
     }
 
-    if (!html) return null;
+    if (!html) {
+      console.warn(`ObsiDrop: kon geen HTML ophalen voor ${url} (${errors.join("; ")})`);
+      return null;
+    }
 
     const title =
       extractMeta(html, "og:title") ||
@@ -80,10 +87,15 @@ export async function fetchOg(
       extractMeta(html, "og:description") ||
       extractMeta(html, "twitter:description") ||
       extractMeta(html, "description");
-    const imageUrl = rawImageUrl ? absolutize(rawImageUrl, fetchUrl) : null;
-    const imageBasename = imageUrl
-      ? await downloadImage(app, attachmentsFolder, imageUrl)
-      : null;
+    let imageBasename: string | null = null;
+    for (const candidate of rawImageCandidates) {
+      const absolute = absolutize(candidate, fetchUrl);
+      const basename = await downloadImage(app, attachmentsFolder, absolute);
+      if (basename) {
+        imageBasename = basename;
+        break;
+      }
+    }
 
     return { sourceUrl: url, title, description, imageBasename };
   } catch (e) {
@@ -150,22 +162,56 @@ async function fetchTikTokOEmbed(
   }
 }
 
-async function downloadHtml(url: string, userAgent: string): Promise<string | null> {
+type DownloadResult = { html: string } | { error: string };
+
+/**
+ * Chrome-fingerprint headers — Cloudflare/WAF-stacks weigeren sobere requests
+ * (alleen UA + Accept) en geven 403 terug voordat de bytes überhaupt geserveerd
+ * worden. Met de volledige `sec-ch-ua-*` + `sec-fetch-*` set passeren we de
+ * default-bot-regels. Wordt voor zowel HTML-scrapes als image-downloads gebruikt.
+ *
+ * Accept-Encoding zetten we *niet*: Electron's requestUrl regelt decompressie
+ * automatisch, en handmatig zetten levert op sommige builds gzipped bytes op.
+ */
+function browserHeaders(
+  userAgent: string,
+  opts: { accept: string; secFetchDest: "document" | "image" },
+): Record<string, string> {
+  const isChrome = userAgent.includes("Chrome/") && !userAgent.includes("Googlebot");
+  const headers: Record<string, string> = {
+    "User-Agent": userAgent,
+    Accept: opts.accept,
+    "Accept-Language": "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7",
+    Referer: "https://www.google.com/",
+  };
+  if (opts.secFetchDest === "document") {
+    headers["Upgrade-Insecure-Requests"] = "1";
+  }
+  if (isChrome) {
+    headers["sec-ch-ua"] = '"Not/A)Brand";v="8", "Chromium";v="126", "Google Chrome";v="126"';
+    headers["sec-ch-ua-mobile"] = "?0";
+    headers["sec-ch-ua-platform"] = '"Windows"';
+    headers["sec-fetch-dest"] = opts.secFetchDest;
+    headers["sec-fetch-mode"] = opts.secFetchDest === "document" ? "navigate" : "no-cors";
+    headers["sec-fetch-site"] = "cross-site";
+    if (opts.secFetchDest === "document") headers["sec-fetch-user"] = "?1";
+  }
+  return headers;
+}
+
+async function downloadHtml(url: string, userAgent: string): Promise<DownloadResult> {
+  const headers = browserHeaders(userAgent, {
+    accept: "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    secFetchDest: "document",
+  });
   try {
-    const res = await requestUrl({
-      url,
-      method: "GET",
-      headers: {
-        "User-Agent": userAgent,
-        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-        "Accept-Language": "nl-NL,nl;q=0.9,en-US;q=0.8,en;q=0.7",
-      },
-      throw: false,
-    });
-    if (res.status < 200 || res.status >= 300) return null;
-    return res.text;
-  } catch {
-    return null;
+    const res = await requestUrl({ url, method: "GET", headers, throw: false });
+    if (res.status < 200 || res.status >= 300) {
+      return { error: `HTTP ${res.status}` };
+    }
+    return { html: res.text };
+  } catch (e) {
+    return { error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -191,13 +237,15 @@ async function downloadImage(
       return filename;
     }
 
-    const res = await requestUrl({
-      url: imageUrl,
-      method: "GET",
-      headers: { "User-Agent": CHROME_UA, Accept: "image/*" },
-      throw: false,
+    const headers = browserHeaders(CHROME_UA, {
+      accept: "image/avif,image/webp,image/apng,image/*,*/*;q=0.8",
+      secFetchDest: "image",
     });
-    if (res.status < 200 || res.status >= 300) return null;
+    const res = await requestUrl({ url: imageUrl, method: "GET", headers, throw: false });
+    if (res.status < 200 || res.status >= 300) {
+      console.warn(`ObsiDrop: image-download faalde voor ${imageUrl} (HTTP ${res.status})`);
+      return null;
+    }
 
     await app.vault.adapter.writeBinary(path, res.arrayBuffer);
     return filename;
@@ -228,14 +276,147 @@ function rewriteForScraping(url: string): string {
   }
 }
 
-function findOgImage(html: string): string | null {
-  return (
-    extractMeta(html, "og:image") ||
-    extractMeta(html, "og:image:url") ||
-    extractMeta(html, "twitter:image") ||
-    extractMeta(html, "twitter:image:src") ||
-    extractLinkImageSrc(html)
-  );
+/**
+ * Verzamelt álle image-kandidaten in prioriteitsvolgorde. Sites zetten soms
+ * een `og:image` die 404't (zie holagestoria.es) — we moeten dan kunnen
+ * terugvallen op twitter:image, JSON-LD of de apple-touch-icon. Duplicates
+ * worden eruit gefilterd zodat we niet twee keer dezelfde 404 ophalen.
+ */
+function findOgImageCandidates(html: string, pageUrl: string): string[] {
+  const sources = [
+    extractMeta(html, "og:image"),
+    extractMeta(html, "og:image:url"),
+    extractMeta(html, "og:image:secure_url"),
+    extractMeta(html, "twitter:image"),
+    extractMeta(html, "twitter:image:src"),
+    extractLinkImageSrc(html),
+    extractJsonLdImage(html),
+    extractAppleTouchIcon(html),
+    extractFirstBodyImage(html, pageUrl),
+  ];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const src of sources) {
+    if (!src || seen.has(src)) continue;
+    seen.add(src);
+    out.push(src);
+  }
+  return out;
+}
+
+/**
+ * Schema.org JSON-LD-blokken kunnen een `image`-veld bevatten — string, object
+ * met `url`, of een array van een van beide. We wandelen de boom recursief af
+ * tot de eerste string-URL.
+ */
+function extractJsonLdImage(html: string): string | null {
+  const scriptRe = /<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
+  let match: RegExpExecArray | null;
+  while ((match = scriptRe.exec(html)) !== null) {
+    try {
+      const json = JSON.parse(match[1].trim());
+      const found = walkForJsonLdImage(json);
+      if (found) return found;
+    } catch {
+      // Invalid JSON-LD — skip.
+    }
+  }
+  return null;
+}
+
+function walkForJsonLdImage(node: unknown): string | null {
+  if (Array.isArray(node)) {
+    for (const item of node) {
+      const found = walkForJsonLdImage(item);
+      if (found) return found;
+    }
+    return null;
+  }
+  if (node && typeof node === "object") {
+    const obj = node as Record<string, unknown>;
+    const image = obj.image;
+    if (typeof image === "string") return image;
+    if (Array.isArray(image)) {
+      for (const item of image) {
+        if (typeof item === "string") return item;
+        if (item && typeof item === "object") {
+          const url = (item as Record<string, unknown>).url;
+          if (typeof url === "string") return url;
+        }
+      }
+    } else if (image && typeof image === "object") {
+      const url = (image as Record<string, unknown>).url;
+      if (typeof url === "string") return url;
+    }
+    for (const key of Object.keys(obj)) {
+      if (key === "image") continue;
+      const found = walkForJsonLdImage(obj[key]);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+/**
+ * Allerlaatste redmiddel — sommige sites (zie holagestoria.es) hebben
+ * álle meta-images kapot of niet-bestaand. Dan pakken we de eerste
+ * niet-triviale `<img>` uit de body, wat meestal het logo of de hero-image
+ * is. Filters tegen ruis: data-URIs (inline base64), SVG's (geen JPG/PNG
+ * dus onze extension-guesser werkt niet), tracking-pixels en spinners.
+ *
+ * We zoeken eerst in `<body>` om te voorkomen dat een favicon uit `<head>`
+ * als img wordt teruggegeven.
+ */
+function extractFirstBodyImage(html: string, pageUrl: string): string | null {
+  const bodyMatch = html.match(/<body\b[\s\S]*$/i);
+  const body = bodyMatch ? bodyMatch[0] : html;
+  const imgRe = /<img\b[^>]*?(?:data-src|data-lazy-src|src)\s*=\s*["']([^"']+)["']/gi;
+  let m: RegExpExecArray | null;
+  while ((m = imgRe.exec(body)) !== null) {
+    const src = decodeHtmlEntities(m[1]).trim();
+    if (!src) continue;
+    if (src.startsWith("data:")) continue;
+    if (/\.svg(\?|#|$)/i.test(src)) continue;
+    if (/\b(spinner|loader|placeholder|pixel|tracking|spacer|blank|transparent)\b/i.test(src)) continue;
+    if (/\b1x1\b|\b1px\b/i.test(src)) continue;
+    if (!isSameSite(src, pageUrl)) continue;
+    return src;
+  }
+  return null;
+}
+
+/**
+ * Filtert third-party img-tags (Google-loginknoppen, Facebook-pixels, etc.) uit
+ * de body-scrape. Relatieve URL's zijn per definitie same-site. Voor absolute
+ * URL's vergelijken we hostnames met `www.`-prefix gestript, en accepteren we
+ * subdomeinen (een CDN op `cdn.holagestoria.es` is nog steeds van die site).
+ */
+function isSameSite(imageSrc: string, pageUrl: string): boolean {
+  if (!/^https?:\/\//i.test(imageSrc)) return true;
+  try {
+    const strip = (h: string) => h.toLowerCase().replace(/^www\./, "");
+    const imgHost = strip(new URL(imageSrc).host);
+    const pageHost = strip(new URL(pageUrl).host);
+    if (imgHost === pageHost) return true;
+    if (imgHost.endsWith("." + pageHost)) return true;
+    if (pageHost.endsWith("." + imgHost)) return true;
+    return false;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Laatste redmiddel voor sites zonder OG/Twitter-meta: de apple-touch-icon.
+ * WordPress genereert die standaard op 180x180, dus ziet er nog acceptabel uit
+ * als card-thumbnail. Beter dan een lege kaart.
+ */
+function extractAppleTouchIcon(html: string): string | null {
+  const p1 = /<link[^>]+?rel\s*=\s*["']apple-touch-icon(?:-precomposed)?["'][^>]*?href\s*=\s*["']([^"']+)["']/i;
+  const p2 = /<link[^>]+?href\s*=\s*["']([^"']+)["'][^>]*?rel\s*=\s*["']apple-touch-icon(?:-precomposed)?["']/i;
+  const m = html.match(p1) || html.match(p2);
+  if (!m) return null;
+  return decodeHtmlEntities(m[1]).trim() || null;
 }
 
 function extractMeta(html: string, propertyName: string): string | null {
