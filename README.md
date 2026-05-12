@@ -31,23 +31,21 @@ Google Keep is great - until you remember Google reads everything you put in the
 
 ## Screenshots
 
-<!--
-IMAGES - to be added to docs/screenshots/ folder:
-
-1. plugin-grid.png   - Obsidian desktop, ObsiDrop card view filled with a handful of colored notes (mix of text, checklist, link-preview cards). 1600×1000 ideal.
-2. plugin-edit.png   - A single card open in the edit modal, showing the toolbar (color, tag, checklist toggle, archive).
-3. android-capture.png - Android phone screenshot, share-target sheet on a webpage with "ObsiDrop" selected.
-4. android-list.png  - Android home screen of ObsiDrop showing the 2-col staggered card grid.
-5. android-editor.png - Android editor view with a checklist + photo embed.
-
-For each: use a real-looking dataset (no Lorem Ipsum), warm lighting, no system clutter (turn on Do Not Disturb before screencap).
--->
+<p align="center">
+  <img src="docs/screenshots/plugin-grid.png" alt="ObsiDrop card grid in Obsidian" width="820" />
+  <br/><sub><em>Obsidian desktop - Keep-style card grid</em></sub>
+</p>
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/plugin-grid.png" alt="ObsiDrop card grid in Obsidian" width="380" /><br/><sub>Obsidian - card grid</sub></td>
-    <td align="center"><img src="docs/screenshots/android-list.png" alt="ObsiDrop Android home screen" width="220" /><br/><sub>Android - home</sub></td>
-    <td align="center"><img src="docs/screenshots/android-capture.png" alt="Android share sheet capturing into ObsiDrop" width="220" /><br/><sub>Android - share-to-note</sub></td>
+    <td align="center" width="60%">
+      <img src="docs/screenshots/plugin-edit.png" alt="Quick-note editor in Obsidian with color, tags, checklist toolbar" />
+      <br/><sub><em>Quick-note editor - colors, tags, checklist, pin</em></sub>
+    </td>
+    <td align="center" width="40%">
+      <img src="docs/screenshots/android-list.png" alt="ObsiDrop Android home screen with 2-column card grid" width="240" />
+      <br/><sub><em>Android - home screen</em></sub>
+    </td>
   </tr>
 </table>
 
