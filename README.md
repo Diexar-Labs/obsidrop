@@ -60,16 +60,23 @@ Google Keep is great - until you remember Google reads everything you put in the
 
 ### Organize
 - **Colors** (11 swatches, colorblind-friendly labels)
-- **Tags** - typed inline or picked from existing
+- **Tags** - typed inline or picked from existing; **filter-chip strip** under the search bar (top-N by frequency, "+N more" sheet for the long tail)
+- **Bulk-select** - long-press a card to enter multi-select; bulk archive or delete with confirmation
 - **Archive** with one tap, restore anytime
 - **Pinned** notes float to the top
 - **Search & filter** across body, title, tags
+- **Reminders** - per-note due-date with Android notifications; "Due" / "Overdue" badges on the card; survives reboot
 
 ### Edit
 - Inline **`- [ ]` checklists** with smart toolbar toggle
-- **Image embeds** (`![[image.jpg]]`) hidden from view, kept on save
+- **Image embeds** (`![[image.jpg]]`) shown as thumbnails on the card
+- **Lightbox** - tap a thumbnail to view full-screen, with "Open externally" fallback
 - **Auto-saves** as you type (and on back-button)
 - **Live preview** of pasted links
+
+### Clip the web
+- **Chrome extension** companion - one-click clip of the current page into your vault as a Markdown note, tags included
+- Talks only to a localhost server inside the plugin (127.0.0.1, token-authenticated) - no cloud relay
 
 ### Sync
 - Files written as `<date>-<slug>.md` with YAML frontmatter (color, tags, archived, pinned)
@@ -100,6 +107,15 @@ Google Keep is great - until you remember Google reads everything you put in the
 ### Syncing the two
 
 Install [Syncthing](https://syncthing.net/) on phone + laptop, point both at your vault folder. Within 30 seconds of capturing on your phone, the note shows up in Obsidian. That's the entire setup.
+
+### Chrome extension (optional web clipper)
+
+1. In the Obsidian plugin's settings, enable **Web clipper** under "Clip server" and copy the token.
+2. Load the [`chrome-extension/`](chrome-extension/) folder as an unpacked extension in Chrome (`chrome://extensions` → Developer mode → Load unpacked).
+3. Open the extension's Options page, paste the token, save.
+4. Click the ObsiDrop icon on any page to clip the URL + title + selection (if any) into your vault as a Markdown note.
+
+The clip server only binds to `127.0.0.1` and never exposes itself on the network. Off by default.
 
 ## How it works
 
@@ -132,10 +148,13 @@ UI in English (default) and Dutch. Skeletons exist for **Spanish, German, French
 - [x] Link previews (Open Graph)
 - [x] Checklists
 - [x] Multi-language (EN/NL + skeletons)
+- [x] Reminders / due-dates
+- [x] Web clipper (Chrome extension)
+- [x] Tag-filter chips + bulk-select (multi-archive / multi-delete)
+- [x] Lightbox for image embeds
 - [ ] Submit to official Obsidian community-plugins register
-- [ ] Reminders / due-dates
 - [ ] iOS share-target (share-extension)
-- [ ] Web clipper (browser extension)
+- [ ] Firefox / Edge clipper (the Chrome extension is MV3, should port cleanly)
 
 ## Contributing
 
