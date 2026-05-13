@@ -108,6 +108,8 @@ Google Keep is great - until you remember Google reads everything you put in the
 
 Install [Syncthing](https://syncthing.net/) on phone + laptop, point both at your vault folder. Within 30 seconds of capturing on your phone, the note shows up in Obsidian. That's the entire setup.
 
+> **Recommended Syncthing setting:** enable **File Versioning** on the shared folder (Simple Versioning is fine), on both devices. Deleted and overwritten files are kept in `.stversions/` so an accidental delete — or a sync race, see [Known issues](#known-issues) — is recoverable instead of permanent.
+
 ### Chrome extension (optional web clipper)
 
 1. In the Obsidian plugin's settings, enable **Web clipper** under "Clip server" and copy the token.
@@ -135,6 +137,18 @@ ObsiDrop is intentionally simple plumbing:
 - Link-preview cards are written as a "pending" placeholder by Android, then the plugin (or Android) fetches the Open Graph data and rewrites the note. A race-safe marker check prevents either side from overwriting user edits.
 
 This is why ObsiDrop **needs no server, no account, no API key** - and why anything that can write to the same folder (e.g. a `curl` script, a Shortcuts automation) can capture into it.
+
+## Known issues
+
+### Bulk delete while a sync peer is offline
+
+If you bulk-delete many notes in the plugin while another device (phone or laptop) running Syncthing is **offline**, the deletes may be "resurrected" when that peer reconnects: the offline peer still has those files with valid version metadata, and on reconnect Syncthing can side with the peer and push the files back to the device that deleted them.
+
+This is Syncthing reconciliation behavior, not specific to ObsiDrop — single deletes you do while everything is online propagate fine. It's the combination of *bulk* delete and an *offline* peer that triggers it. Mitigations:
+
+- Make sure Syncthing is **running on every device** before bulk-deleting, and stays running for ~30s after so the deletes propagate.
+- Enable **File Versioning** in Syncthing (see [Syncing the two](#syncing-the-two)). Even if files do come back, you have copies in `.stversions/` to delete from properly.
+- The bulk-delete confirmation dialog reminds you of this — it's not paranoia, it's avoiding this exact failure mode.
 
 ## Languages
 
