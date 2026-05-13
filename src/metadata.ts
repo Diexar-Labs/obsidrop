@@ -38,12 +38,15 @@ export interface NoteMeta {
   color: ColorName;
   tags: string[];
   pinned: boolean;
+  /** ISO 8601 local datetime string ("YYYY-MM-DDTHH:mm") of een herinnering, of null. */
+  reminder: string | null;
 }
 
 export const DEFAULT_META: NoteMeta = {
   color: "default",
   tags: [],
   pinned: false,
+  reminder: null,
 };
 
 export function isColorName(value: unknown): value is ColorName {
@@ -75,14 +78,22 @@ export function readMeta(app: App, file: TFile): NoteMeta {
   } else if (typeof fm.tags === "string") {
     for (const t of fm.tags.split(/[\s,]+/)) pushTag(t);
   }
-  // Inline #hashtags worden door cache.tags geleverd.
-  if (cache?.tags) {
-    for (const ref of cache.tags) pushTag(ref.tag);
-  }
+  // Bewust GÉÉN inline #hashtags meegenomen. Anders pollueren tags uit
+  // gedeelde social-media-posts (#fyp, #trending) de kaart-chips én de
+  // vault-brede graph-view. User-tags komen via de capture/edit-chip-UI
+  // en belanden netjes in frontmatter.
 
   const pinned = fm.pinned === true || fm.pinned === "true";
 
-  return { color, tags, pinned };
+  let reminder: string | null = null;
+  if (typeof fm.reminder === "string" && fm.reminder.trim().length > 0) {
+    // Accepteer zowel "YYYY-MM-DDTHH:mm" als volledige ISO. We bewaren de
+    // ingevoerde lokale datetime-string letterlijk; conversie naar epoch
+    // gebeurt pas in de scheduler.
+    reminder = fm.reminder.trim();
+  }
+
+  return { color, tags, pinned, reminder };
 }
 
 /**
@@ -109,7 +120,56 @@ export async function updateMeta(
       if (cleaned.length === 0) delete fm.tags;
       else fm.tags = Array.from(new Set(cleaned));
     }
+    if (patch.reminder !== undefined) {
+      if (patch.reminder === null || patch.reminder === "") {
+        delete fm.reminder;
+      } else {
+        fm.reminder = patch.reminder;
+      }
+    }
   });
+}
+
+/**
+ * Parseert een reminder-string naar epoch-ms. Geeft NaN bij ongeldige input.
+ * Accepteert "YYYY-MM-DDTHH:mm" (lokale tijd) en volledige ISO 8601.
+ */
+export function parseReminderMs(reminder: string | null): number {
+  if (!reminder) return NaN;
+  const ms = Date.parse(reminder);
+  return Number.isFinite(ms) ? ms : NaN;
+}
+
+/**
+ * Formatteert een reminder kort relatief t.o.v. nu. Geeft labels in de UI-taal
+ * van de plugin terug via `t()`. Bewust kleurloos — kleurenblind-vriendelijk:
+ * verlopen reminders herken je aan het label "Verlopen" / "Overdue", niet aan
+ * een rode kleur alleen.
+ */
+export function formatReminderShort(reminder: string | null, now: number = Date.now()): string {
+  const ms = parseReminderMs(reminder);
+  if (!Number.isFinite(ms)) return "";
+  const diff = ms - now;
+  const absMin = Math.abs(diff) / 60000;
+  const overdue = diff < 0;
+  if (absMin < 1) return t(overdue ? "reminder_just_overdue" : "reminder_now");
+  if (absMin < 60) {
+    const n = Math.round(absMin);
+    return t(overdue ? "reminder_min_overdue" : "reminder_in_min", String(n));
+  }
+  const absHr = absMin / 60;
+  if (absHr < 24) {
+    const n = Math.round(absHr);
+    return t(overdue ? "reminder_hr_overdue" : "reminder_in_hr", String(n));
+  }
+  const absDay = absHr / 24;
+  if (absDay < 30) {
+    const n = Math.round(absDay);
+    return t(overdue ? "reminder_day_overdue" : "reminder_in_day", String(n));
+  }
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /**
@@ -128,6 +188,46 @@ export function getAllVaultTags(app: App): string[] {
  */
 export function stripFrontmatter(content: string): string {
   return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
+}
+
+/**
+ * Escape inline `#hashtag`-syntax in vrije tekst zodat Obsidian ze NIET
+ * indexeert als tag. `#fyp` → `\#fyp`. In reading view rendert het nog
+ * steeds als `#fyp`, maar graph-view en tag-pane blijven schoon.
+ *
+ * Werkt buiten code-fences en inline-code. Slaat heading-markers (`# Title`),
+ * wiki-link-anchors (`[[Note#Heading]]`) en URL-anchors (`example.com#x`) over
+ * via lookbehind op `[\\\w/]`. Niet idempotent uitvoeren is veilig: al-geescapete
+ * `\#` matcht niet opnieuw.
+ */
+export function neutralizeInlineHashtags(text: string): string {
+  const fenceParts = text.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g);
+  return fenceParts
+    .map((part, i) => {
+      if (i % 2 === 1) return part;
+      return part
+        .split(/(`[^`\n]+`)/g)
+        .map((seg, j) => {
+          if (j % 2 === 1) return seg;
+          return seg.replace(/(?<![\\\w/])#([A-Za-z_/][\w/-]*)/g, "\\#$1");
+        })
+        .join("");
+    })
+    .join("");
+}
+
+/**
+ * Past `neutralizeInlineHashtags` toe op alleen de body van een markdown-document.
+ * Frontmatter-blok blijft onaangeroerd.
+ */
+export function neutralizeBodyHashtags(content: string): string {
+  const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
+  if (fmMatch) {
+    const fm = fmMatch[0];
+    const body = content.slice(fm.length);
+    return fm + neutralizeInlineHashtags(body);
+  }
+  return neutralizeInlineHashtags(content);
 }
 
 /**

@@ -38,6 +38,28 @@ export function detectUrl(text: string): string | null {
   return match[0].replace(/[.,)\]}"'!?;:]+$/, "");
 }
 
+/**
+ * Alle unieke `http(s)://`-URL's in volgorde van voorkomen, na strippen van
+ * embed-syntax zodat lokale image-paden niet matchen. Wordt door de capture-flow
+ * gebruikt om OG-fallback te doen: probeer eerste URL → bij geen image, probeer
+ * volgende, enz.
+ */
+export function detectAllUrls(text: string): string[] {
+  const cleaned = text
+    .replace(/!\[\[[^\]]+\]\]/g, "")
+    .replace(/!\[[^\]]*\]\([^)]+\)/g, "");
+  const matches = cleaned.match(/https?:\/\/[^\s)<>"']+/g) || [];
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of matches) {
+    const clean = raw.replace(/[.,)\]}"'!?;:]+$/, "");
+    if (!clean || seen.has(clean)) continue;
+    seen.add(clean);
+    out.push(clean);
+  }
+  return out;
+}
+
 export async function fetchOg(
   app: App,
   attachmentsFolder: string,

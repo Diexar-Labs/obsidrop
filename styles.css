@@ -59,6 +59,300 @@
   outline-offset: 1px;
 }
 
+.obsidrop-toolbar.is-hidden,
+.obsidrop-filter-bar.is-hidden {
+  display: none;
+}
+
+/* Selection-mode top-bar — vervangt de normale toolbar terwijl er
+   bulk-selectie actief is. */
+.obsidrop-selection-toolbar {
+  gap: 8px;
+}
+
+.obsidrop-selection-exit,
+.obsidrop-selection-action {
+  background: transparent;
+  border: 1px solid transparent;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--text-normal);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.obsidrop-selection-exit:hover,
+.obsidrop-selection-action:hover {
+  background: var(--background-modifier-hover);
+}
+
+.obsidrop-selection-action.is-active {
+  color: var(--interactive-accent);
+  border-color: var(--interactive-accent);
+}
+
+.obsidrop-selection-action.is-destructive:hover {
+  background: rgba(220, 60, 60, 0.12);
+  color: #d33;
+}
+
+.obsidrop-selection-count {
+  font-weight: 600;
+  flex: 1;
+  color: var(--text-normal);
+}
+
+.obsidrop-selection-spacer {
+  flex: 1;
+}
+
+/* Selection-marker (rechtsboven op kaart). Default verborgen; verschijnt
+   alleen tijdens selection-mode via .is-selecting op de root. Shape-based
+   (gevulde vs lege cirkel) zodat kleurperceptie niet nodig is. */
+.obsidrop-card-select-marker {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 22px;
+  height: 22px;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  background: var(--background-primary);
+  border-radius: 50%;
+  padding: 1px;
+  z-index: 2;
+  pointer-events: none;
+}
+
+.is-selecting .obsidrop-card-select-marker {
+  display: inline-flex;
+}
+
+.obsidrop-card.is-selected .obsidrop-card-select-marker {
+  color: var(--interactive-accent);
+}
+
+.obsidrop-card.is-selected {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: -2px;
+}
+
+/* Tijdens selection-mode: action-row verbergen (klikken zou collide-en
+   met toggle) en de pin-emoji-indicator wegmaken zodat 'ie niet onder de
+   selectie-marker valt. */
+.is-selecting .obsidrop-card-actions {
+  display: none;
+}
+
+.is-selecting .obsidrop-card.is-pinned::before {
+  display: none;
+}
+
+/* In selection-mode tonen we ook normaal verborgen action-row niet meer;
+   tap-target = hele kaart-body, dus cursor blijft pointer. */
+.is-selecting .obsidrop-card-body {
+  cursor: pointer;
+}
+
+/* Bevestigings-modal (ConfirmModal) */
+.obsidrop-confirm-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.obsidrop-confirm-cancel,
+.obsidrop-confirm-ok {
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 0.95em;
+}
+
+.obsidrop-confirm-cancel:hover {
+  background: var(--background-modifier-hover);
+}
+
+.obsidrop-confirm-ok {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.obsidrop-confirm-ok:hover {
+  background: var(--interactive-accent-hover);
+}
+
+.obsidrop-confirm-ok.is-destructive {
+  background: #c0392b;
+  border-color: #c0392b;
+  color: #fff;
+}
+
+.obsidrop-confirm-ok.is-destructive:hover {
+  background: #a93226;
+}
+
+/* Tag-filter chip-strip onder de toolbar */
+.obsidrop-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 0;
+}
+
+.obsidrop-filter-bar.is-hidden {
+  display: none;
+}
+
+.obsidrop-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 0.82em;
+  line-height: 1.2;
+}
+
+.obsidrop-filter-chip:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Geselecteerd chip: accent-achtergrond, sterkere rand én een ✓-symbool.
+   ✓ is essentieel — kleur alléén is niet voldoende voor kleurenblinde
+   gebruikers (pariteit met de Android-FilterChip die ook een Done-icon
+   inblendt). */
+.obsidrop-filter-chip.is-selected {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+  font-weight: 600;
+}
+
+.obsidrop-filter-chip-check {
+  display: inline-flex;
+  min-width: 10px;
+  font-weight: 700;
+}
+
+.obsidrop-filter-chip.is-overflow {
+  border-style: dashed;
+  color: var(--text-muted);
+}
+
+.obsidrop-filter-clear {
+  margin-left: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 0.8em;
+  text-decoration: underline;
+}
+
+.obsidrop-filter-clear:hover {
+  color: var(--text-normal);
+}
+
+/* Tag-picker modal (overflow-sheet) */
+.obsidrop-tagpicker-search {
+  width: 100%;
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  margin-bottom: 12px;
+}
+
+.obsidrop-tagpicker-search:focus {
+  outline: 2px solid var(--interactive-accent);
+  outline-offset: 1px;
+}
+
+.obsidrop-tagpicker-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.obsidrop-tagpicker-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.obsidrop-tagpicker-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.obsidrop-tagpicker-row.is-selected {
+  background: var(--background-modifier-active-hover);
+}
+
+.obsidrop-tagpicker-check {
+  display: inline-flex;
+  min-width: 14px;
+  font-weight: 700;
+  color: var(--interactive-accent);
+}
+
+.obsidrop-tagpicker-name {
+  flex: 1;
+  color: var(--text-normal);
+}
+
+.obsidrop-tagpicker-count {
+  font-size: 0.78em;
+  color: var(--text-muted);
+  background: var(--background-modifier-hover);
+  padding: 1px 7px;
+  border-radius: 999px;
+}
+
+.obsidrop-tagpicker-empty {
+  padding: 16px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.obsidrop-empty-clear {
+  margin-top: 12px;
+  padding: 6px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.obsidrop-empty-clear:hover {
+  background: var(--background-modifier-hover);
+}
+
 .obsidrop-section {
   display: flex;
   flex-direction: column;
@@ -288,6 +582,108 @@
   color: var(--text-normal);
 }
 
+.obsidrop-card-reminder {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 0.78em;
+  background: var(--background-modifier-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--background-modifier-border);
+  /* Bewust geen kleur-onderscheid tussen "te doen" en "verlopen": het label
+     ("⏰ Te doen" vs "⚠ Verlopen") en de gestreepte rand dragen de info,
+     zodat het ook zonder kleurperceptie te lezen blijft. */
+}
+
+.obsidrop-card-reminder.is-overdue {
+  border-style: dashed;
+  font-weight: 600;
+  color: var(--text-normal);
+}
+
+.obsidrop-card-reminder-rel {
+  opacity: 0.8;
+}
+
+.obsidrop-reminder-row {
+  align-items: center;
+  gap: 8px;
+}
+
+.obsidrop-edit-reminder {
+  padding: 4px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  color: var(--text-normal);
+  font-family: inherit;
+  font-size: 0.9em;
+}
+
+.obsidrop-reminder-notice {
+  cursor: pointer;
+}
+
+.obsidrop-card-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 8px;
+}
+
+.obsidrop-card-link {
+  font-size: 0.72em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--text-accent);
+  text-decoration: none;
+  border: 1px solid transparent;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.obsidrop-card-link::before {
+  content: "🔗 ";
+  opacity: 0.7;
+}
+
+.obsidrop-card-link:hover {
+  border-color: var(--text-accent);
+  background: rgba(0, 0, 0, 0.1);
+}
+
+.theme-dark .obsidrop-card-link {
+  background: rgba(255, 255, 255, 0.08);
+}
+.theme-dark .obsidrop-card-link:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.obsidrop-card[data-color]:not([data-color="default"]) .obsidrop-card-link {
+  color: inherit;
+  background: rgba(0, 0, 0, 0.12);
+}
+
+.obsidrop-card-link-more {
+  font-size: 0.72em;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--text-muted);
+  border: 1px dashed var(--background-modifier-border);
+  cursor: pointer;
+}
+
+.theme-dark .obsidrop-card-link-more {
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .obsidrop-card-tags {
   display: flex;
   flex-wrap: wrap;
@@ -507,6 +903,31 @@
   color: var(--text-normal);
 }
 
+.obsidrop-edit-thumbnail {
+  margin: 8px 0 12px;
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: zoom-in;
+  background: var(--background-secondary);
+  max-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.obsidrop-edit-thumbnail img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
+}
+
+.obsidrop-edit-thumbnail:hover {
+  border-color: var(--interactive-accent);
+}
+
 .obsidrop-edit-body {
   width: 100%;
   min-height: 220px;
@@ -570,6 +991,71 @@
 .obsidrop-suggest-path {
   font-size: 0.75em;
   color: var(--text-muted);
+}
+
+/* Lightbox-modal: volle-grootte afbeelding bij klik op kaart met thumbnail */
+.obsidrop-lightbox .obsidrop-lightbox-figure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0;
+  background: rgba(0, 0, 0, 0.04);
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 70vh;
+}
+
+.theme-dark .obsidrop-lightbox .obsidrop-lightbox-figure {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.obsidrop-lightbox-img {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  display: block;
+}
+
+.obsidrop-lightbox-error {
+  padding: 24px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.obsidrop-lightbox-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+  margin-top: 14px;
+  flex-wrap: wrap;
+}
+
+.obsidrop-lightbox-actions button,
+.obsidrop-lightbox-external {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  text-decoration: none;
+  cursor: pointer;
+  font-size: 0.9em;
+}
+
+.obsidrop-lightbox-actions button:hover,
+.obsidrop-lightbox-external:hover {
+  background: var(--background-modifier-hover);
+}
+
+.obsidrop-lightbox-actions button.mod-cta {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: var(--interactive-accent);
+}
+
+.obsidrop-lightbox-actions button.mod-cta:hover {
+  background: var(--interactive-accent-hover);
 }
 
 /* Smal scherm: minder kolombreedte */

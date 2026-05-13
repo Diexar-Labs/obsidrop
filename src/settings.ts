@@ -1,6 +1,12 @@
-import { App, PluginSettingTab, Setting } from "obsidian";
+import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import type ObsiDropPlugin from "./main";
 import { t } from "./i18n";
+
+function generateToken(): string {
+  const bytes = new Uint8Array(24);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
 
 export type SortMode = "modified-desc" | "modified-asc" | "created-desc" | "created-asc" | "title-asc";
 
@@ -10,6 +16,12 @@ export interface ObsiDropSettings {
   sortMode: SortMode;
   cardWidth: number;
   showArchived: boolean;
+  /** Of de loopback HTTP-server voor de Chrome-extension actief moet zijn. */
+  clipServerEnabled: boolean;
+  /** Poort waarop de loopback-server luistert (alleen 127.0.0.1). */
+  clipServerPort: number;
+  /** Bearer-token dat de extension moet meesturen. Wordt automatisch gegenereerd. */
+  clipServerToken: string;
 }
 
 export const DEFAULT_SETTINGS: ObsiDropSettings = {
@@ -18,6 +30,9 @@ export const DEFAULT_SETTINGS: ObsiDropSettings = {
   sortMode: "modified-desc",
   cardWidth: 240,
   showArchived: false,
+  clipServerEnabled: false,
+  clipServerPort: 27124,
+  clipServerToken: "",
 };
 
 export class ObsiDropSettingTab extends PluginSettingTab {
@@ -105,6 +120,78 @@ export class ObsiDropSettingTab extends PluginSettingTab {
           this.plugin.refreshViews();
         })
       );
+
+    // Chrome-extension clip-server — bewust beneden de basics, niet iedereen
+    // gebruikt 'm en het hoeft niet bovenaan te schreeuwen om aandacht.
+    containerEl.createEl("h3", { text: t("settings_clip_server_section") });
+    const clipDesc = containerEl.createEl("p", {
+      cls: "obsidrop-clip-desc",
+      text: t("settings_clip_server_desc"),
+    });
+    void clipDesc;
+
+    new Setting(containerEl)
+      .setName(t("settings_clip_server_enabled"))
+      .setDesc(t("settings_clip_server_enabled_desc"))
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.clipServerEnabled).onChange(async (value) => {
+          this.plugin.settings.clipServerEnabled = value;
+          if (value && !this.plugin.settings.clipServerToken) {
+            this.plugin.settings.clipServerToken = generateToken();
+          }
+          await this.plugin.saveSettings();
+          this.plugin.applyClipServerState();
+          this.display();
+        }),
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings_clip_server_port"))
+      .setDesc(t("settings_clip_server_port_desc"))
+      .addText((text) =>
+        text
+          .setPlaceholder("27124")
+          .setValue(String(this.plugin.settings.clipServerPort))
+          .onChange(async (value) => {
+            const n = parseInt(value, 10);
+            if (Number.isFinite(n) && n >= 1024 && n <= 65535) {
+              this.plugin.settings.clipServerPort = n;
+              await this.plugin.saveSettings();
+              this.plugin.applyClipServerState();
+            }
+          }),
+      );
+
+    const tokenSetting = new Setting(containerEl)
+      .setName(t("settings_clip_server_token"))
+      .setDesc(t("settings_clip_server_token_desc"));
+    tokenSetting.addText((text) => {
+      text
+        .setValue(this.plugin.settings.clipServerToken)
+        .setDisabled(true);
+      text.inputEl.style.width = "100%";
+      text.inputEl.style.fontFamily = "monospace";
+    });
+    tokenSetting.addButton((btn) =>
+      btn
+        .setButtonText(t("settings_clip_server_copy"))
+        .onClick(async () => {
+          await navigator.clipboard.writeText(this.plugin.settings.clipServerToken);
+          new Notice(t("notice_token_copied"));
+        }),
+    );
+    tokenSetting.addButton((btn) =>
+      btn
+        .setButtonText(t("settings_clip_server_regenerate"))
+        .setWarning()
+        .onClick(async () => {
+          this.plugin.settings.clipServerToken = generateToken();
+          await this.plugin.saveSettings();
+          this.plugin.applyClipServerState();
+          this.display();
+          new Notice(t("notice_token_regenerated"));
+        }),
+    );
 
     // "Over ObsiDrop" — discrete, klikt zelf weg als de gebruiker er geen
     // interesse in heeft. Geen popups, geen "premium"-features. Open source +

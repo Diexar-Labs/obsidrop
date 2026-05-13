@@ -6,19 +6,26 @@ import {
   COLOR_NAMES,
   ColorName,
   getAllVaultTags,
+  neutralizeBodyHashtags,
   updateMeta,
 } from "./metadata";
-import { buildLinkNote, detectUrl, fetchOg } from "./ogfetch";
+import { buildLinkNote, detectAllUrls, fetchOg, OgPreview } from "./ogfetch";
 import { t } from "./i18n";
 
 export class QuickCaptureModal extends Modal {
   plugin: ObsiDropPlugin;
   textArea!: HTMLTextAreaElement;
   private chipsEl!: HTMLElement;
-  private state: { color: ColorName; tags: string[]; pinned: boolean } = {
+  private state: {
+    color: ColorName;
+    tags: string[];
+    pinned: boolean;
+    reminder: string | null;
+  } = {
     color: "default",
     tags: [],
     pinned: false,
+    reminder: null,
   };
 
   constructor(app: App, plugin: ObsiDropPlugin) {
@@ -105,6 +112,26 @@ export class QuickCaptureModal extends Modal {
     });
     checkBtn.addEventListener("click", () => this.toggleOrInsertChecklist());
 
+    // Reminder-input
+    const reminderRow = bar.createDiv({ cls: "obsidrop-edit-row obsidrop-reminder-row" });
+    reminderRow.createSpan({ text: t("label_reminder"), cls: "obsidrop-edit-label" });
+    const reminderInput = reminderRow.createEl("input", {
+      cls: "obsidrop-edit-reminder",
+      attr: { type: "datetime-local" },
+    });
+    if (this.state.reminder) reminderInput.value = this.state.reminder;
+    reminderInput.addEventListener("change", () => {
+      this.state.reminder = reminderInput.value.trim() || null;
+    });
+    const clearReminder = reminderRow.createEl("button", {
+      cls: "obsidrop-edit-linkbtn",
+      text: t("action_clear_reminder"),
+    });
+    clearReminder.addEventListener("click", () => {
+      reminderInput.value = "";
+      this.state.reminder = null;
+    });
+
     // Tags
     const tagRow = bar.createDiv({ cls: "obsidrop-edit-tagrow" });
     tagRow.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
@@ -180,18 +207,33 @@ export class QuickCaptureModal extends Modal {
     }
 
     // Als de tekst een URL bevat, haal OG-meta op en bed de thumbnail in.
+    // Bij meerdere URL's proberen we ze sequentieel tot er één een image-OG geeft.
     // Soft-fail: bij timeout of fout slaan we gewoon de originele tekst op.
-    const url = detectUrl(content);
-    if (url) {
+    const urls = detectAllUrls(content).slice(0, 3);
+    if (urls.length > 0) {
       const notice = new Notice(t("notice_fetching_preview"), 0);
       try {
         const attachmentsFolder = `${this.plugin.settings.notesFolder}/.attachments`;
-        const preview = await withTimeout(
-          fetchOg(this.app, attachmentsFolder, url),
-          10_000,
-        );
-        if (preview) {
-          content = buildLinkNote(url, preview, content);
+        let chosenUrl: string | null = null;
+        let chosenPreview: OgPreview | null = null;
+        for (const candidate of urls) {
+          const preview = await withTimeout(
+            fetchOg(this.app, attachmentsFolder, candidate),
+            10_000,
+          );
+          if (!preview) continue;
+          if (!chosenPreview) {
+            chosenUrl = candidate;
+            chosenPreview = preview;
+          }
+          if (preview.imageBasename) {
+            chosenUrl = candidate;
+            chosenPreview = preview;
+            break;
+          }
+        }
+        if (chosenUrl && chosenPreview) {
+          content = buildLinkNote(chosenUrl, chosenPreview, content);
         }
       } catch (e) {
         console.error("ObsiDrop: preview ophalen mislukt:", e);
@@ -201,12 +243,21 @@ export class QuickCaptureModal extends Modal {
     }
 
     try {
-      const file = await createNoteInFolder(this.app, this.plugin.settings.notesFolder, content);
-      if (this.state.color !== "default" || this.state.tags.length > 0 || this.state.pinned) {
+      // Escape inline #hashtags zodat ze Obsidian's vault-brede tag-index niet
+      // pollueren. User-tags zitten al in `state.tags` en gaan naar frontmatter.
+      const safeContent = neutralizeBodyHashtags(content);
+      const file = await createNoteInFolder(this.app, this.plugin.settings.notesFolder, safeContent);
+      if (
+        this.state.color !== "default" ||
+        this.state.tags.length > 0 ||
+        this.state.pinned ||
+        this.state.reminder
+      ) {
         await updateMeta(this.app, file, {
           color: this.state.color,
           tags: this.state.tags,
           pinned: this.state.pinned,
+          reminder: this.state.reminder,
         });
       }
       new Notice(t("notice_saved", file.basename));

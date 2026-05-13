@@ -1,6 +1,7 @@
 import { App, Modal, Notice, SuggestModal, TFile, normalizePath } from "obsidian";
 import type ObsiDropPlugin from "./main";
 import { toggleOrInsertChecklistOnTextArea } from "./capture";
+import { LightboxModal } from "./lightbox";
 import { t } from "./i18n";
 import {
   colorLabel,
@@ -8,6 +9,7 @@ import {
   ColorName,
   getAllVaultTags,
   isColorName,
+  neutralizeInlineHashtags,
   readMeta,
   stripFrontmatter,
   updateMeta,
@@ -20,6 +22,7 @@ interface EditableNote {
   color: ColorName;
   tags: string[];
   pinned: boolean;
+  reminder: string | null;
 }
 
 /**
@@ -58,6 +61,7 @@ export class EditNoteModal extends Modal {
       color: meta.color,
       tags: [...meta.tags],
       pinned: meta.pinned,
+      reminder: meta.reminder,
     };
     this.originalBody = textPart;
     this.originalEmbeds = [...embeds];
@@ -71,6 +75,8 @@ export class EditNoteModal extends Modal {
 
     const controls = root.createDiv({ cls: "obsidrop-edit-controls" });
     this.renderControls(controls);
+
+    this.renderEmbedThumbnail(root);
 
     this.bodyEl = root.createEl("textarea", {
       cls: "obsidrop-edit-body",
@@ -159,6 +165,38 @@ export class EditNoteModal extends Modal {
       this.state.body = this.bodyEl.value;
     });
 
+    // Reminder
+    const reminderRow = parent.createDiv({ cls: "obsidrop-edit-row obsidrop-reminder-row" });
+    reminderRow.createSpan({ text: t("label_reminder"), cls: "obsidrop-edit-label" });
+    const reminderInput = reminderRow.createEl("input", {
+      cls: "obsidrop-edit-reminder",
+      attr: { type: "datetime-local" },
+    });
+    if (this.state.reminder) reminderInput.value = this.state.reminder;
+    reminderInput.addEventListener("change", async () => {
+      this.state.reminder = reminderInput.value.trim() || null;
+      try {
+        await updateMeta(this.app, this.file, { reminder: this.state.reminder });
+        this.plugin.refreshViews();
+      } catch (err) {
+        new Notice(t("notice_error", err instanceof Error ? err.message : String(err)));
+      }
+    });
+    const clearReminder = reminderRow.createEl("button", {
+      cls: "obsidrop-edit-linkbtn",
+      text: t("action_clear_reminder"),
+    });
+    clearReminder.addEventListener("click", async () => {
+      reminderInput.value = "";
+      this.state.reminder = null;
+      try {
+        await updateMeta(this.app, this.file, { reminder: null });
+        this.plugin.refreshViews();
+      } catch (err) {
+        new Notice(t("notice_error", err instanceof Error ? err.message : String(err)));
+      }
+    });
+
     // Tags + chip-input
     const tagWrap = parent.createDiv({ cls: "obsidrop-edit-tagrow" });
     tagWrap.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
@@ -225,6 +263,58 @@ export class EditNoteModal extends Modal {
     this.state.body = ta.value;
   }
 
+  /**
+   * Toont de eerste ingebedde afbeelding als klikbare thumbnail bovenaan de
+   * modal. De embed-regels staan niet in het tekstveld (worden bij save weer
+   * teruggevoegd), dus zonder deze thumbnail had je geen toegang tot de
+   * afbeelding-zelf vanuit de bewerk-modal.
+   */
+  private renderEmbedThumbnail(parent: HTMLElement): void {
+    if (this.state.embedLines.length === 0) return;
+    const match = this.state.embedLines[0].match(/!\[\[([^\]|]+?)(?:\|[^\]]*)?\]\]/);
+    if (!match) return;
+    const basename = match[1].trim();
+    const resolved = this.resolveAttachment(basename);
+    if (!resolved) return;
+
+    const wrap = parent.createDiv({ cls: "obsidrop-edit-thumbnail" });
+    const img = wrap.createEl("img");
+    img.src = resolved.resourcePath;
+    img.alt = "";
+    img.addEventListener("error", () => wrap.remove());
+    wrap.addEventListener("click", () => {
+      new LightboxModal(
+        this.app,
+        this.plugin,
+        this.file,
+        resolved.resourcePath,
+        resolved.file,
+        resolved.vaultPath,
+      ).open();
+    });
+  }
+
+  private resolveAttachment(
+    basename: string,
+  ): { resourcePath: string; file: TFile | null; vaultPath: string } | null {
+    const dest = this.app.metadataCache.getFirstLinkpathDest(basename, this.file.path);
+    if (dest) {
+      return {
+        resourcePath: this.app.vault.getResourcePath(dest),
+        file: dest,
+        vaultPath: dest.path,
+      };
+    }
+    const noteFolder = this.file.parent?.path ?? "";
+    const candidate = noteFolder ? `${noteFolder}/.attachments/${basename}` : `.attachments/${basename}`;
+    const normalized = normalizePath(candidate);
+    return {
+      resourcePath: this.app.vault.adapter.getResourcePath(normalized),
+      file: null,
+      vaultPath: normalized,
+    };
+  }
+
   private async save(): Promise<void> {
     try {
       const embedsChanged =
@@ -235,13 +325,15 @@ export class EditNoteModal extends Modal {
         color: this.state.color,
         tags: this.state.tags,
         pinned: this.state.pinned,
+        reminder: this.state.reminder,
       });
       if (bodyChanged) {
         // Lees opnieuw zodat onze nieuwe frontmatter behouden blijft
         const current = await this.app.vault.read(this.file);
         const fmMatch = current.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
         const fm = fmMatch ? fmMatch[0] : "";
-        const combined = combineBodyAndEmbeds(this.state.body, this.state.embedLines);
+        const safeBody = neutralizeInlineHashtags(this.state.body);
+        const combined = combineBodyAndEmbeds(safeBody, this.state.embedLines);
         const newContent = `${fm}${combined.replace(/^\n+/, "")}`;
         await this.app.vault.modify(this.file, newContent);
       }

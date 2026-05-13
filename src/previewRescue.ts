@@ -10,10 +10,12 @@ import { t } from "./i18n";
  * reden ook niet kon afronden — bv. omdat de telefoon offline was, de batterij
  * leeg ging, of WorkManager-retries op zijn.
  *
- * Wachttijd: 15s voor we ingrijpen, zodat Android-PreviewWorker eerst zijn
- * kans krijgt en we geen Syncthing-conflicts triggeren. Marker-check vóór elke
- * write voorkomt dat we user-edits of een net-succesvolle Android-update
- * overschrijven.
+ * Strategie: rescue alleen als de file-mtime ouder is dan `MIN_RESCUE_AGE_MS`.
+ * Bij elke modify-event wordt de timer-deadline opnieuw berekend a.d.h.v. de
+ * verse mtime — Android's eigen OG-update bumpt de mtime en reset zo onze
+ * wachttijd, waardoor we hun verse versie nooit overrulen. Voorkomt
+ * Syncthing-conflicts bij trage OG-endpoints (TikTok-oEmbed loopt soms
+ * 30s+).
  */
 
 // Accepteer beide markers — `diexar-preview` blijft erin voor placeholders die
@@ -22,7 +24,11 @@ const PENDING_MARKER_REGEX = /<!--\s*(?:obsidrop|diexar)-preview:\s*pending\s*--
 function hasPendingMarker(content: string): boolean {
   return PENDING_MARKER_REGEX.test(content);
 }
-const RESCUE_DELAY_MS = 15_000;
+
+// Marker moet minstens 5 min oud zijn (volgens file-mtime) voor we ingrijpen.
+// Geeft Android ruim baan om z'n eigen PreviewWorker af te ronden, ook bij
+// trage OG-endpoints + Syncthing-propagatie-vertraging.
+const MIN_RESCUE_AGE_MS = 5 * 60 * 1000;
 
 export class PreviewRescue {
   private pending = new Map<string, number>();
@@ -105,13 +111,22 @@ export class PreviewRescue {
       }
       return;
     }
-    // Al gepland — een nieuwe modify hoeft 'm niet opnieuw te starten,
-    // anders schuift de timer eindeloos op bij snelle Syncthing-updates.
-    if (this.pending.has(file.path)) return;
+    // Bij modify event: oude timer cancellen en opnieuw plannen met verse
+    // mtime — Android-OG-updates resetten zo onze wachttijd, en daarmee de
+    // race die Syncthing-conflicts veroorzaakt.
+    const existing = this.pending.get(file.path);
+    if (existing != null) {
+      window.clearTimeout(existing);
+      this.pending.delete(file.path);
+    }
+    const age = Date.now() - file.stat.mtime;
+    // Minimum 1s wachten om snelle burst-events te debouncen; max = de
+    // resterende tijd tot mtime + MIN_RESCUE_AGE_MS.
+    const wait = Math.max(MIN_RESCUE_AGE_MS - age, 1_000);
     const timer = window.setTimeout(() => {
       this.pending.delete(file.path);
       void this.rescue(file);
-    }, RESCUE_DELAY_MS);
+    }, wait);
     this.pending.set(file.path, timer);
   }
 
@@ -123,6 +138,13 @@ export class PreviewRescue {
       return;
     }
     if (!hasPendingMarker(content)) return; // Android was 'm voor.
+
+    // Mtime kan tijdens onze fetch opnieuw zijn ververst door een binnenkomende
+    // Syncthing-update — re-plan i.p.v. doorgaan, anders alsnog conflict-risico.
+    if (Date.now() - file.stat.mtime < MIN_RESCUE_AGE_MS) {
+      void this.maybeSchedule(file);
+      return;
+    }
 
     const url = detectUrl(content);
     if (!url) return;
