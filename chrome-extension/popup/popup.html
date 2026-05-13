@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Clip to ObsiDrop</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header class="head">
+    <h1>Clip to ObsiDrop</h1>
+    <span id="status" class="status status-idle" aria-live="polite">Ready</span>
+  </header>
+
+  <section class="preview" aria-label="Page preview">
+    <div class="preview-title" id="pageTitle"></div>
+    <div class="preview-url" id="pageUrl"></div>
+  </section>
+
+  <label class="field">
+    <span>Selection (optional)</span>
+    <textarea id="selection" rows="3" placeholder="Highlight text on the page, then reopen this popup."></textarea>
+  </label>
+
+  <label class="field">
+    <span>Tags</span>
+    <div id="tagsBox" class="tags-box">
+      <input id="tags" type="text" placeholder="Type tag, press Enter" autocomplete="off" />
+    </div>
+  </label>
+
+  <label class="field">
+    <span>Color</span>
+    <select id="color">
+      <option value="default">Default</option>
+      <option value="red">Red</option>
+      <option value="orange">Orange</option>
+      <option value="yellow">Yellow</option>
+      <option value="green">Cream</option>
+      <option value="teal">Slate blue</option>
+      <option value="blue">Blue</option>
+      <option value="purple">Purple</option>
+      <option value="pink">Pink</option>
+      <option value="brown">Brown</option>
+      <option value="gray">Gray</option>
+    </select>
+  </label>
+
+  <label class="field field-inline">
+    <input id="pinned" type="checkbox" />
+    <span>Pin card</span>
+  </label>
+
+  <footer class="foot">
+    <button id="optionsBtn" class="btn-secondary" type="button">Options…</button>
+    <button id="saveBtn" class="btn-primary" type="button">Save to ObsiDrop</button>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>

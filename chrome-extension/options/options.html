@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>ObsiDrop Web Clipper — Options</title>
+  <link rel="stylesheet" href="../popup/popup.css" />
+  <style>
+    body { width: auto; max-width: 520px; padding: 24px; }
+    h1 { font-size: 16px; margin: 0 0 16px; }
+    .hint { font-size: 12px; color: var(--muted); margin: 4px 0 12px; }
+    .row { display: flex; gap: 8px; align-items: center; }
+    .row input[type="text"] { flex: 1; font-family: monospace; }
+  </style>
+</head>
+<body>
+  <h1>ObsiDrop Web Clipper — Options</h1>
+
+  <label class="field">
+    <span>Plugin port</span>
+    <input id="port" type="number" min="1024" max="65535" value="27124" />
+    <p class="hint">Matches "Port" in the plugin settings. Default is 27124.</p>
+  </label>
+
+  <label class="field">
+    <span>Token</span>
+    <div class="row">
+      <input id="token" type="text" placeholder="Paste token from plugin settings" />
+      <button id="paste" class="btn-secondary" type="button">Paste</button>
+    </div>
+    <p class="hint">In Obsidian → ObsiDrop settings → "Web clipper" → Copy token. Then paste it here.</p>
+  </label>
+
+  <div class="row" style="margin-top: 16px;">
+    <button id="test" class="btn-secondary" type="button">Test connection</button>
+    <button id="save" class="btn-primary" type="button">Save</button>
+  </div>
+
+  <p id="status" class="hint" aria-live="polite" style="margin-top: 12px;"></p>
+
+  <script src="options.js"></script>
+</body>
+</html>
