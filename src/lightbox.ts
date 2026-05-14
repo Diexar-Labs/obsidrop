@@ -4,9 +4,9 @@ import { EditNoteModal } from "./edit";
 import { t } from "./i18n";
 
 /**
- * Modal die de bij-de-kaart-horende afbeelding op volle grootte toont. Geopend
- * wanneer de gebruiker op een kaart-met-thumbnail klikt; biedt knoppen om de
- * notitie te bewerken of de afbeelding in een Obsidian-tab te openen.
+ * Modal that shows the card's associated image at full size. Opened when the
+ * user clicks a card with a thumbnail; provides buttons to edit the note or
+ * open the image in an Obsidian tab.
  */
 export class LightboxModal extends Modal {
   private plugin: ObsiDropPlugin;
@@ -81,7 +81,7 @@ export class LightboxModal extends Modal {
       externalBtn.addEventListener("click", async () => {
         try {
           const fullPath = adapter.getFullPath(this.vaultPath!);
-          // Electron's shell ligt onder de hood; werkt alleen desktop.
+          // Electron's shell is under the hood; desktop only.
           // eslint-disable-next-line @typescript-eslint/no-var-requires
           const { shell } = require("electron");
           const err = await shell.openPath(fullPath);

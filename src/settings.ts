@@ -16,11 +16,11 @@ export interface ObsiDropSettings {
   sortMode: SortMode;
   cardWidth: number;
   showArchived: boolean;
-  /** Of de loopback HTTP-server voor de Chrome-extension actief moet zijn. */
+  /** Whether the loopback HTTP server for the Chrome extension should be active. */
   clipServerEnabled: boolean;
-  /** Poort waarop de loopback-server luistert (alleen 127.0.0.1). */
+  /** Port the loopback server listens on (127.0.0.1 only). */
   clipServerPort: number;
-  /** Bearer-token dat de extension moet meesturen. Wordt automatisch gegenereerd. */
+  /** Bearer token the extension must send. Generated automatically. */
   clipServerToken: string;
 }
 
@@ -121,8 +121,8 @@ export class ObsiDropSettingTab extends PluginSettingTab {
         })
       );
 
-    // Chrome-extension clip-server — bewust beneden de basics, niet iedereen
-    // gebruikt 'm en het hoeft niet bovenaan te schreeuwen om aandacht.
+    // Chrome-extension clip server — deliberately below the basics; not everyone
+    // uses it and it does not need to shout for attention at the top.
     containerEl.createEl("h3", { text: t("settings_clip_server_section") });
     const clipDesc = containerEl.createEl("p", {
       cls: "obsidrop-clip-desc",
@@ -193,9 +193,9 @@ export class ObsiDropSettingTab extends PluginSettingTab {
         }),
     );
 
-    // "Over ObsiDrop" — discrete, klikt zelf weg als de gebruiker er geen
-    // interesse in heeft. Geen popups, geen "premium"-features. Open source +
-    // optionele bedankjes-knop.
+    // "About ObsiDrop" — unobtrusive, dismisses itself if the user has no
+    // interest. No popups, no "premium" features. Open source +
+    // optional thank-you button.
     const support = containerEl.createDiv({ cls: "obsidrop-support" });
     support.createEl("h3", { text: t("section_support") });
     support.createEl("p", { text: t("support_blurb") });
@@ -205,6 +205,6 @@ export class ObsiDropSettingTab extends PluginSettingTab {
       attr: { href: "https://ko-fi.com/L3L11ZETB9", target: "_blank", rel: "noopener noreferrer" },
     });
     kofiLink.setText(t("support_kofi"));
-    // GitHub Sponsors wordt toegevoegd zodra de aanvraag goedgekeurd is.
+    // GitHub Sponsors will be added once the application is approved.
   }
 }

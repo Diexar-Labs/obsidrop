@@ -1,7 +1,7 @@
 {
   "name": "obsidrop",
   "version": "0.1.0",
-  "description": "Google Keep-stijl kaartjesweergave voor Obsidian.",
+  "description": "Google Keep–style quick-capture card grid for Obsidian.",
   "main": "main.js",
   "scripts": {
     "dev": "node esbuild.config.mjs",

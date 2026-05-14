@@ -38,7 +38,7 @@ export interface NoteMeta {
   color: ColorName;
   tags: string[];
   pinned: boolean;
-  /** ISO 8601 local datetime string ("YYYY-MM-DDTHH:mm") of een herinnering, of null. */
+  /** ISO 8601 local datetime string ("YYYY-MM-DDTHH:mm") for a reminder, or null. */
   reminder: string | null;
 }
 
@@ -54,7 +54,7 @@ export function isColorName(value: unknown): value is ColorName {
 }
 
 /**
- * Leest metadata uit de Obsidian metadataCache. Werkt zonder eigen YAML-parser.
+ * Reads metadata from the Obsidian metadataCache. Works without a custom YAML parser.
  */
 export function readMeta(app: App, file: TFile): NoteMeta {
   const cache = app.metadataCache.getFileCache(file);
@@ -78,18 +78,18 @@ export function readMeta(app: App, file: TFile): NoteMeta {
   } else if (typeof fm.tags === "string") {
     for (const t of fm.tags.split(/[\s,]+/)) pushTag(t);
   }
-  // Bewust GÉÉN inline #hashtags meegenomen. Anders pollueren tags uit
-  // gedeelde social-media-posts (#fyp, #trending) de kaart-chips én de
-  // vault-brede graph-view. User-tags komen via de capture/edit-chip-UI
-  // en belanden netjes in frontmatter.
+  // Deliberately NO inline #hashtags included. Otherwise tags from shared
+  // social-media posts (#fyp, #trending) pollute the card chips and the
+  // vault-wide graph view. User tags come via the capture/edit chip UI
+  // and land neatly in frontmatter.
 
   const pinned = fm.pinned === true || fm.pinned === "true";
 
   let reminder: string | null = null;
   if (typeof fm.reminder === "string" && fm.reminder.trim().length > 0) {
-    // Accepteer zowel "YYYY-MM-DDTHH:mm" als volledige ISO. We bewaren de
-    // ingevoerde lokale datetime-string letterlijk; conversie naar epoch
-    // gebeurt pas in de scheduler.
+    // Accept both "YYYY-MM-DDTHH:mm" and full ISO. We store the entered
+    // local datetime string verbatim; conversion to epoch happens only
+    // in the scheduler.
     reminder = fm.reminder.trim();
   }
 
@@ -97,7 +97,7 @@ export function readMeta(app: App, file: TFile): NoteMeta {
 }
 
 /**
- * Past metadata aan in een notitie via processFrontMatter (read-modify-write veilig).
+ * Updates metadata in a note via processFrontMatter (read-modify-write safe).
  */
 export async function updateMeta(
   app: App,
@@ -131,8 +131,8 @@ export async function updateMeta(
 }
 
 /**
- * Parseert een reminder-string naar epoch-ms. Geeft NaN bij ongeldige input.
- * Accepteert "YYYY-MM-DDTHH:mm" (lokale tijd) en volledige ISO 8601.
+ * Parses a reminder string to epoch-ms. Returns NaN for invalid input.
+ * Accepts "YYYY-MM-DDTHH:mm" (local time) and full ISO 8601.
  */
 export function parseReminderMs(reminder: string | null): number {
   if (!reminder) return NaN;
@@ -141,10 +141,9 @@ export function parseReminderMs(reminder: string | null): number {
 }
 
 /**
- * Formatteert een reminder kort relatief t.o.v. nu. Geeft labels in de UI-taal
- * van de plugin terug via `t()`. Bewust kleurloos — kleurenblind-vriendelijk:
- * verlopen reminders herken je aan het label "Verlopen" / "Overdue", niet aan
- * een rode kleur alleen.
+ * Formats a reminder briefly relative to now. Returns labels in the plugin UI
+ * language via `t()`. Deliberately colorless — color-blind friendly:
+ * overdue reminders are identified by the "Overdue" label, not by color alone.
  */
 export function formatReminderShort(reminder: string | null, now: number = Date.now()): string {
   const ms = parseReminderMs(reminder);
@@ -173,7 +172,7 @@ export function formatReminderShort(reminder: string | null, now: number = Date.
 }
 
 /**
- * Geeft alle bekende tags in de vault als gesorteerde lijst (voor autocomplete).
+ * Returns all known tags in the vault as a sorted list (for autocomplete).
  */
 export function getAllVaultTags(app: App): string[] {
   const raw = (app.metadataCache as unknown as { getTags?: () => Record<string, number> }).getTags?.() ?? {};
@@ -184,21 +183,21 @@ export function getAllVaultTags(app: App): string[] {
 }
 
 /**
- * Geeft de body van een notitie zonder frontmatter-blok.
+ * Returns the body of a note without the frontmatter block.
  */
 export function stripFrontmatter(content: string): string {
   return content.replace(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/, "");
 }
 
 /**
- * Escape inline `#hashtag`-syntax in vrije tekst zodat Obsidian ze NIET
- * indexeert als tag. `#fyp` → `\#fyp`. In reading view rendert het nog
- * steeds als `#fyp`, maar graph-view en tag-pane blijven schoon.
+ * Escapes inline `#hashtag` syntax in free text so Obsidian does NOT index
+ * them as tags. `#fyp` → `\#fyp`. In reading view it still renders as `#fyp`,
+ * but graph view and tag pane stay clean.
  *
- * Werkt buiten code-fences en inline-code. Slaat heading-markers (`# Title`),
- * wiki-link-anchors (`[[Note#Heading]]`) en URL-anchors (`example.com#x`) over
- * via lookbehind op `[\\\w/]`. Niet idempotent uitvoeren is veilig: al-geescapete
- * `\#` matcht niet opnieuw.
+ * Operates outside code fences and inline code. Skips heading markers (`# Title`),
+ * wiki-link anchors (`[[Note#Heading]]`) and URL anchors (`example.com#x`)
+ * via lookbehind on `[\\\w/]`. Running it non-idempotently is safe: already-escaped
+ * `\#` does not match again.
  */
 export function neutralizeInlineHashtags(text: string): string {
   const fenceParts = text.split(/(```[\s\S]*?```|~~~[\s\S]*?~~~)/g);
@@ -217,8 +216,8 @@ export function neutralizeInlineHashtags(text: string): string {
 }
 
 /**
- * Past `neutralizeInlineHashtags` toe op alleen de body van een markdown-document.
- * Frontmatter-blok blijft onaangeroerd.
+ * Applies `neutralizeInlineHashtags` to only the body of a markdown document.
+ * The frontmatter block is left untouched.
  */
 export function neutralizeBodyHashtags(content: string): string {
   const fmMatch = content.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
@@ -231,21 +230,21 @@ export function neutralizeBodyHashtags(content: string): string {
 }
 
 /**
- * Heel beperkte HTML-render voor previews: escapet HTML, rendert `[[link]]` en `[[link|alias]]`
- * als gestileerde spans, en zet `[text](url)` plus losse http(s)-URL's om naar klikbare
- * `<a class="obsidrop-url">`-tags. Klikken worden afgevangen door de view via delegation.
+ * Very limited HTML render for previews: escapes HTML, renders `[[link]]` and `[[link|alias]]`
+ * as styled spans, and converts `[text](url)` plus bare http(s) URLs into clickable
+ * `<a class="obsidrop-url">` tags. Clicks are caught by the view via delegation.
  */
 export function renderInlinePreviewHtml(text: string): string {
-  // Checklist-syntax aan begin van een regel wordt vervangen door vorm-glyphs.
-  // Vorm i.p.v. kleur, dus ook leesbaar zonder kleur-onderscheid (kleurenblind-vriendelijk).
+  // Checklist syntax at the start of a line is replaced by shape glyphs.
+  // Shape instead of color, so readable without color distinction (color-blind friendly).
   const withChecks = text
     .replace(/^- \[ \] /gm, "☐ ")
     .replace(/^- \[[xX]\] /gm, "☑ ");
 
   const escaped = escapeHtml(withChecks);
 
-  // Wikilinks → spans. target/alias komen uit reeds geescapete tekst,
-  // dus geen tweede escape-laag toepassen.
+  // Wikilinks → spans. target/alias come from already-escaped text,
+  // so no second escape layer should be applied.
   const withWiki = escaped.replace(
     /\[\[([^\]\|\n]+)(?:\|([^\]\n]+))?\]\]/g,
     (_match, target: string, alias?: string) => {
@@ -255,14 +254,14 @@ export function renderInlinePreviewHtml(text: string): string {
     },
   );
 
-  // Markdown-links eerst naar placeholders zodat de bare-URL-pass hun href-deel niet opnieuw matcht.
+  // Markdown links to placeholders first so the bare-URL pass does not re-match their href part.
   const placeholders: string[] = [];
   const withMd = withWiki.replace(
     /\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g,
     (_m, label: string, url: string) => {
       const idx = placeholders.length;
-      // url komt al door de buitenste escapeHtml-pass; niet nogmaals escapen,
-      // anders krijg je &amp;amp; in href en knappen Telegraaf-URLs af op 404.
+      // url has already gone through the outer escapeHtml pass; do not escape again,
+      // otherwise you get &amp;amp; in href and Telegraaf URLs break with 404.
       placeholders.push(
         `<a class="obsidrop-url" data-href="${url}" rel="noopener noreferrer">${label}</a>`,
       );
@@ -270,7 +269,7 @@ export function renderInlinePreviewHtml(text: string): string {
     },
   );
 
-  // Losse URL's
+  // Bare URLs
   const withUrls = withMd.replace(
     /https?:\/\/\S+/g,
     (raw: string) => {

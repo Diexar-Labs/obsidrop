@@ -26,9 +26,9 @@ interface EditableNote {
 }
 
 /**
- * Bewerk-modal voor een bestaande notitie. Toont kleur-pille, pin-toggle, tag-chips
- * met autocomplete, link-invoeg-knop en de body-editor. Slaat op via processFrontMatter
- * voor metadata en vault.modify voor body.
+ * Edit modal for an existing note. Shows color pills, pin toggle, tag chips
+ * with autocomplete, link-insert button and the body editor. Saves via
+ * processFrontMatter for metadata and vault.modify for body.
  */
 export class EditNoteModal extends Modal {
   private plugin: ObsiDropPlugin;
@@ -104,7 +104,7 @@ export class EditNoteModal extends Modal {
   private renderControls(parent: HTMLElement): void {
     parent.empty();
 
-    // Kleurkiezer — wijzigingen worden direct opgeslagen
+    // Color picker — changes are saved immediately
     const colorWrap = parent.createDiv({ cls: "obsidrop-edit-colorrow" });
     colorWrap.createSpan({ text: t("label_color"), cls: "obsidrop-edit-label" });
     const swatches = colorWrap.createDiv({ cls: "obsidrop-edit-swatches" });
@@ -130,7 +130,7 @@ export class EditNoteModal extends Modal {
       });
     }
 
-    // Pin-toggle — direct opslaan
+    // Pin toggle — save immediately
     const pinWrap = parent.createDiv({ cls: "obsidrop-edit-row" });
     const pinBtn = pinWrap.createEl("button", {
       cls: `obsidrop-edit-pin${this.state.pinned ? " is-active" : ""}`,
@@ -147,7 +147,7 @@ export class EditNoteModal extends Modal {
       }
     });
 
-    // Link-invoegen
+    // Link insert
     const linkBtn = pinWrap.createEl("button", {
       cls: "obsidrop-edit-linkbtn",
       text: t("action_insert_link"),
@@ -197,7 +197,7 @@ export class EditNoteModal extends Modal {
       }
     });
 
-    // Tags + chip-input
+    // Tags + chip input
     const tagWrap = parent.createDiv({ cls: "obsidrop-edit-tagrow" });
     tagWrap.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
     this.chipsEl = tagWrap.createDiv({ cls: "obsidrop-edit-chips" });
@@ -264,10 +264,9 @@ export class EditNoteModal extends Modal {
   }
 
   /**
-   * Toont de eerste ingebedde afbeelding als klikbare thumbnail bovenaan de
-   * modal. De embed-regels staan niet in het tekstveld (worden bij save weer
-   * teruggevoegd), dus zonder deze thumbnail had je geen toegang tot de
-   * afbeelding-zelf vanuit de bewerk-modal.
+   * Shows the first embedded image as a clickable thumbnail at the top of the
+   * modal. Embed lines are not in the text field (they are re-added on save),
+   * so without this thumbnail the image would be inaccessible from the edit modal.
    */
   private renderEmbedThumbnail(parent: HTMLElement): void {
     if (this.state.embedLines.length === 0) return;
@@ -328,7 +327,7 @@ export class EditNoteModal extends Modal {
         reminder: this.state.reminder,
       });
       if (bodyChanged) {
-        // Lees opnieuw zodat onze nieuwe frontmatter behouden blijft
+        // Re-read so our new frontmatter is preserved
         const current = await this.app.vault.read(this.file);
         const fmMatch = current.match(/^---\r?\n[\s\S]*?\r?\n---\r?\n?/);
         const fm = fmMatch ? fmMatch[0] : "";
@@ -352,8 +351,8 @@ export class EditNoteModal extends Modal {
 }
 
 /**
- * Suggest-modal met autocomplete uit alle markdown-bestanden in de vault.
- * Geeft het gekozen pad (zonder .md) terug via callback.
+ * Suggest modal with autocomplete from all markdown files in the vault.
+ * Returns the chosen path (without .md) via callback.
  */
 export class InsertLinkModal extends SuggestModal<TFile> {
   private onPick: (linkPath: string) => void;
@@ -379,7 +378,7 @@ export class InsertLinkModal extends SuggestModal<TFile> {
   }
 
   onChooseSuggestion(item: TFile): void {
-    // Obsidian-conventie: link met de basename als 'ie uniek is, anders het pad zonder .md.
+    // Obsidian convention: link with the basename if it is unique, otherwise the path without .md.
     const matches = this.app.vault.getMarkdownFiles().filter((f) => f.basename === item.basename);
     const linkPath = matches.length === 1 ? item.basename : item.path.replace(/\.md$/, "");
     this.onPick(linkPath);
@@ -389,9 +388,9 @@ export class InsertLinkModal extends SuggestModal<TFile> {
 const EMBED_LINE_REGEX = /^\s*!\[\[[^\]]+\]\]\s*$/;
 
 /**
- * Splitst de body in tekst (zonder embed-only regels) en de embed-regels los.
- * Houdt blank-line-structuur intact maar vouwt opeenvolgende lege regels
- * samen die ontstaan door het uitfilteren van een embed.
+ * Splits the body into text (without embed-only lines) and the embed lines separately.
+ * Keeps blank-line structure intact but collapses consecutive blank lines that
+ * result from filtering out an embed.
  */
 export function splitBodyAndEmbeds(body: string): { textPart: string; embeds: string[] } {
   const embeds: string[] = [];

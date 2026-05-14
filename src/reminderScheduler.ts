@@ -6,10 +6,10 @@ import { parseReminderMs, readMeta } from "./metadata";
 import { t } from "./i18n";
 
 /**
- * Houdt window-timeouts bij per notitie-pad zodat reminders kunnen worden
- * herschikt zodra een notitie wijzigt, en netjes opgeruimd bij plugin-unload.
- * setTimeout heeft een max delay van ~24.8 dagen — voor reminders verder weg
- * herplannen we elke dag i.p.v. één gigantische timeout.
+ * Tracks window timeouts per note path so reminders can be rescheduled
+ * when a note changes, and cleaned up properly on plugin unload.
+ * setTimeout has a max delay of ~24.8 days — for reminders further away
+ * we reschedule every day instead of one giant timeout.
  */
 export class ReminderScheduler {
   private plugin: ObsiDropPlugin;
@@ -36,11 +36,11 @@ export class ReminderScheduler {
     if (!Number.isFinite(ms)) return;
 
     const delay = ms - Date.now();
-    if (delay <= 0) return; // Reeds verlopen — kaart toont "Verlopen"-badge; we vuren niet retroactief.
+    if (delay <= 0) return; // Already overdue — card shows "Overdue" badge; we do not fire retroactively.
 
     if (delay > ReminderScheduler.MAX_DELAY_MS) {
-      // Wacht 24 u en herevalueer; vermijdt browser-setTimeout overflow op
-      // verre data en maakt herstart na slaapstand robuuster.
+      // Wait 24 h and re-evaluate; avoids browser setTimeout overflow for
+      // far-future dates and makes restart after sleep more robust.
       const id = window.setTimeout(() => {
         this.timers.delete(file.path);
         this.scheduleFile(file);
@@ -70,8 +70,8 @@ export class ReminderScheduler {
   }
 
   private fire(file: TFile): void {
-    // Notice met klik-handler → opent lightbox als er een attachment is,
-    // anders de edit-modal.
+    // Notice with click handler → opens lightbox if there is an attachment,
+    // otherwise the edit modal.
     const notice = new Notice(t("notice_reminder_fired", file.basename), 30_000);
     notice.noticeEl.addClass("obsidrop-reminder-notice");
     notice.noticeEl.addEventListener("click", () => {
@@ -81,7 +81,7 @@ export class ReminderScheduler {
   }
 
   private async openCard(file: TFile): Promise<void> {
-    // Probeer een ingebedde afbeelding te vinden voor lightbox; anders edit-modal.
+    // Try to find an embedded image for the lightbox; otherwise edit modal.
     const content = await this.plugin.app.vault.cachedRead(file);
     const m = content.match(/!\[\[([^\]|]+?)\]\]/);
     if (m) {

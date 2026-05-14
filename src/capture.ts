@@ -71,7 +71,7 @@ export class QuickCaptureModal extends Modal {
     if (!bar) bar = parent.createDiv({ cls: "obsidrop-capture-controls" });
     bar.empty();
 
-    // Kleur
+    // Color
     const colorRow = bar.createDiv({ cls: "obsidrop-edit-colorrow" });
     colorRow.createSpan({ text: t("label_color"), cls: "obsidrop-edit-label" });
     const swatches = colorRow.createDiv({ cls: "obsidrop-edit-swatches" });
@@ -206,9 +206,9 @@ export class QuickCaptureModal extends Modal {
       return;
     }
 
-    // Als de tekst een URL bevat, haal OG-meta op en bed de thumbnail in.
-    // Bij meerdere URL's proberen we ze sequentieel tot er één een image-OG geeft.
-    // Soft-fail: bij timeout of fout slaan we gewoon de originele tekst op.
+    // If the text contains a URL, fetch OG meta and embed the thumbnail.
+    // With multiple URLs we try them sequentially until one yields an OG image.
+    // Soft-fail: on timeout or error we simply save the original text.
     const urls = detectAllUrls(content).slice(0, 3);
     if (urls.length > 0) {
       const notice = new Notice(t("notice_fetching_preview"), 0);
@@ -236,15 +236,15 @@ export class QuickCaptureModal extends Modal {
           content = buildLinkNote(chosenUrl, chosenPreview, content);
         }
       } catch (e) {
-        console.error("ObsiDrop: preview ophalen mislukt:", e);
+        console.error("ObsiDrop: preview fetch failed:", e);
       } finally {
         notice.hide();
       }
     }
 
     try {
-      // Escape inline #hashtags zodat ze Obsidian's vault-brede tag-index niet
-      // pollueren. User-tags zitten al in `state.tags` en gaan naar frontmatter.
+      // Escape inline #hashtags so they do not pollute Obsidian's vault-wide
+      // tag index. User tags are already in `state.tags` and go to frontmatter.
       const safeContent = neutralizeBodyHashtags(content);
       const file = await createNoteInFolder(this.app, this.plugin.settings.notesFolder, safeContent);
       if (
@@ -276,9 +276,9 @@ export class QuickCaptureModal extends Modal {
 }
 
 /**
- * Smart checklist-toggle voor textarea: kijkt naar de huidige regel onder de
- * cursor en wisselt `- [ ]` ↔ `- [x]`, of voegt `- [ ] ` in aan begin van de
- * regel als er nog geen checkbox op staat. Gespiegeld met de Android-editor.
+ * Smart checklist toggle for textarea: inspects the current line under the
+ * cursor and toggles `- [ ]` ↔ `- [x]`, or inserts `- [ ] ` at the start of
+ * the line if no checkbox is present yet. Mirrored with the Android editor.
  */
 export function toggleOrInsertChecklistOnTextArea(ta: HTMLTextAreaElement): void {
   const value = ta.value;

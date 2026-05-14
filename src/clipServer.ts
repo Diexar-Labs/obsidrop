@@ -5,9 +5,9 @@ import { buildLinkNote, fetchOg } from "./ogfetch";
 import { neutralizeBodyHashtags, updateMeta, ColorName, isColorName } from "./metadata";
 import { t } from "./i18n";
 
-// Node's http-module via Electron's CommonJS-bridge. Obsidian draait op Electron
-// dus require werkt. Geen import-statement omdat 'http' niet in TS-types staat
-// voor Obsidian-plugins.
+// Node's http module via Electron's CommonJS bridge. Obsidian runs on Electron
+// so require works. No import statement because 'http' is not in the TS types
+// for Obsidian plugins.
 
 /* eslint-disable @typescript-eslint/no-var-requires */
 const http = require("http");
@@ -43,9 +43,9 @@ interface ClipBody {
 }
 
 /**
- * Loopback-only HTTP-server (127.0.0.1) die de Chrome-extension gebruikt om
- * een pagina als notitie in de vault te droppen. Authenticeert via Bearer-token
- * uit settings; weigert alles wat niet POST /clip is.
+ * Loopback-only HTTP server (127.0.0.1) used by the Chrome extension to drop
+ * a page as a note into the vault. Authenticates via Bearer token from
+ * settings; rejects everything that is not POST /clip.
  */
 export class ClipServer {
   private plugin: ObsiDropPlugin;
@@ -84,7 +84,7 @@ export class ClipServer {
     new Notice(t("notice_clip_server_stopped"));
   }
 
-  /** Herstart wanneer poort of token wijzigt. */
+  /** Restarts when port or token changes. */
   restart(): void {
     this.stop();
     this.start();
@@ -95,9 +95,8 @@ export class ClipServer {
   }
 
   private handle(req: IncomingMessageLike, res: ServerResponseLike): void {
-    // CORS — alleen browser-extensies (chrome- en moz-extension:) krijgen ACAO,
-    // andere origins krijgen niks zodat een willekeurige tab onze poort niet
-    // kan poken.
+    // CORS — only browser extensions (chrome- and moz-extension:) get ACAO;
+    // other origins get nothing so a random tab cannot probe our port.
     const origin = headerValue(req.headers["origin"]);
     const isExtension =
       origin.startsWith("chrome-extension://") ||
@@ -117,7 +116,7 @@ export class ClipServer {
     }
 
     if (req.method === "GET" && req.url === "/ping") {
-      // Health-check voor de extension om te detecteren of de plugin draait.
+      // Health-check for the extension to detect whether the plugin is running.
       res.writeHead(200, { "Content-Type": "application/json" });
       res.end(JSON.stringify({ ok: true, app: "obsidrop" }));
       return;
@@ -178,14 +177,14 @@ export class ClipServer {
         10_000,
       );
       if (preview) {
-        // We hebben handmatige content opgebouwd; buildLinkNote vervangt 'm alleen
-        // bij "alleen URL"-input. Hier mergen we het image-embed handmatig erop.
+        // We built manual content; buildLinkNote only replaces it for
+        // "URL-only" input. Here we merge the image embed manually.
         if (preview.imageBasename) {
           content = `![[${preview.imageBasename}]]\n\n${content}`;
         }
       }
     } catch (e) {
-      console.error("ObsiDrop clip: OG-fetch faalde:", e);
+      console.error("ObsiDrop clip: OG-fetch failed:", e);
     }
 
     const safe = neutralizeBodyHashtags(content);
@@ -229,8 +228,8 @@ function sanitizeUrl(v: unknown): string | null {
 
 function sanitizeText(v: unknown): string {
   if (typeof v !== "string") return "";
-  // Knip extreem lange selecties af zodat een per-ongeluk-select-all niet
-  // 5 MB tekst de notitie in pompt. 8 KB is meer dan genoeg voor een quote.
+  // Truncate extremely long selections so an accidental select-all does not
+  // pump 5 MB of text into the note. 8 KB is more than enough for a quote.
   return v.replace(/\r/g, "").trim().slice(0, 8000);
 }
 
@@ -257,4 +256,4 @@ async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null
   ]);
 }
 
-// Re-export niet nodig — clip-server importeert direct uit andere modules.
+// No re-export needed — clip server imports directly from other modules.

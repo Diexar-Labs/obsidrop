@@ -17,8 +17,8 @@ import { t } from "./i18n";
 export default class ObsiDropPlugin extends Plugin {
   settings!: ObsiDropSettings;
   private refreshTimer: number | null = null;
-  // Paden waarvan we de volgende modify-event willen negeren: gebruikt bij
-  // in-place updates (bv. kleurwissel) zodat de grid niet hersorteert door mtime.
+  // Paths whose next modify-event should be ignored: used during in-place
+  // updates (e.g. color change) so the grid does not re-sort due to mtime bump.
   private readonly suppressedPaths: Set<string> = new Set();
   private reminderScheduler!: ReminderScheduler;
   private clipServer!: ClipServer;
@@ -76,8 +76,8 @@ export default class ObsiDropPlugin extends Plugin {
       this.applyClipServerState();
     });
 
-    // Obsidian-URI fallback voor de Chrome-extension wanneer de loopback-server
-    // uit staat of de plugin nog niet draaide bij send. Schema:
+    // Obsidian-URI fallback for the Chrome extension when the loopback server
+    // is off or the plugin was not running at send time. Schema:
     // obsidian://obsidrop-clip?url=…&title=…&selection=…&tags=…&color=…
     this.registerObsidianProtocolHandler("obsidrop-clip", (params) => {
       void this.handleClipFromUri(params);
@@ -101,13 +101,13 @@ export default class ObsiDropPlugin extends Plugin {
   }
 
   onunload(): void {
-    // Obsidian sluit de view automatisch
+    // Obsidian closes the view automatically
     this.reminderScheduler?.cancelAll();
     this.clipServer?.stop();
   }
 
   /**
-   * Start of stop de clip-server volgens settings; herstart bij poort-wijziging.
+   * Starts or stops the clip server according to settings; restarts on port change.
    */
   applyClipServerState(): void {
     if (!this.clipServer) return;
@@ -124,8 +124,8 @@ export default class ObsiDropPlugin extends Plugin {
   }
 
   /**
-   * Verwerkt een obsidian://obsidrop-clip?…-URI als fallback voor wanneer de
-   * loopback-server niet draaide bij send. Doet OG-fetch en maakt notitie.
+   * Handles an obsidian://obsidrop-clip?…-URI as fallback for when the
+   * loopback server was not running at send time. Does OG fetch and creates note.
    */
   private async handleClipFromUri(params: Record<string, string>): Promise<void> {
     const url = (params.url || "").trim();
@@ -149,7 +149,7 @@ export default class ObsiDropPlugin extends Plugin {
         content = `![[${preview.imageBasename}]]\n\n${content}`;
       }
     } catch (e) {
-      console.error("ObsiDrop URI-clip: OG-fetch faalde:", e);
+      console.error("ObsiDrop URI-clip: OG-fetch failed:", e);
     } finally {
       notice.hide();
     }
@@ -185,9 +185,9 @@ export default class ObsiDropPlugin extends Plugin {
   }
 
   /**
-   * Markeer dat de eerstvolgende modify-event voor dit pad genegeerd moet worden.
-   * Wordt gebruikt bij in-place metadata-updates (kleurwissel) zodat de grid
-   * niet hersorteert vanwege de bumpende mtime. Auto-clear na 2s als veiligheid.
+   * Marks that the next modify event for this path should be ignored.
+   * Used during in-place metadata updates (color change) so the grid does not
+   * re-sort due to the bumping mtime. Auto-clears after 2s as a safety net.
    */
   suppressModifyOnce(path: string): void {
     this.suppressedPaths.add(path);
@@ -195,9 +195,9 @@ export default class ObsiDropPlugin extends Plugin {
   }
 
   /**
-   * Loopt door alle notities onder `notesFolder` (incl. archief) en escapet
-   * inline `#hashtags` zodat ze niet meer in Obsidian's vault-brede tag-index
-   * verschijnen. Eénmalige migratie voor notities die vóór de fix gesynct zijn.
+   * Iterates all notes under `notesFolder` (incl. archive) and escapes inline
+   * `#hashtags` so they no longer appear in Obsidian's vault-wide tag index.
+   * One-time migration for notes synced before the fix.
    */
   async neutralizeExistingHashtags(): Promise<void> {
     const root = normalizePath(this.settings.notesFolder);
@@ -214,7 +214,7 @@ export default class ObsiDropPlugin extends Plugin {
           changed += 1;
         }
       } catch (err) {
-        console.error("ObsiDrop: neutralize faalde voor", file.path, err);
+        console.error("ObsiDrop: neutralize failed for", file.path, err);
       }
     }
     if (changed === 0) {

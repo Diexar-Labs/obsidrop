@@ -7,11 +7,10 @@ export interface TagItem {
 }
 
 /**
- * Multi-select tag-picker. Toont een doorzoekbaar alfabetisch lijstje van
- * álle tags in de huidige note-set met een ✓-marker per geselecteerde tag.
- * Klik = toggle; modal blijft open tot de gebruiker 'm sluit (zodat er
- * meerdere tags na elkaar aangevinkt kunnen worden). Pendant van de Android-
- * `TagPickerSheet`.
+ * Multi-select tag picker. Shows a searchable alphabetical list of all
+ * tags in the current note set with a ✓ marker per selected tag.
+ * Click = toggle; modal stays open until the user closes it (so multiple
+ * tags can be checked in succession). Counterpart of the Android `TagPickerSheet`.
  */
 export class TagPickerModal extends Modal {
   private items: TagItem[];
@@ -29,8 +28,8 @@ export class TagPickerModal extends Modal {
   ) {
     super(app);
     this.items = items;
-    // Eigen kopie zodat aan/uitvinken in de modal direct visueel klopt
-    // zonder dat we de buitenwereld hoeven te herraadplegen.
+    // Own copy so toggling in the modal is immediately visually correct
+    // without needing to re-query the outside world.
     this.selected = new Set(selected);
     this.onToggle = onToggle;
   }
@@ -51,7 +50,7 @@ export class TagPickerModal extends Modal {
 
     this.listEl = contentEl.createDiv({ cls: "obsidrop-tagpicker-list" });
     this.renderList();
-    // Focus zoekveld zodat de gebruiker meteen kan filteren.
+    // Focus the search field so the user can filter immediately.
     setTimeout(() => this.inputEl.focus(), 0);
   }
 

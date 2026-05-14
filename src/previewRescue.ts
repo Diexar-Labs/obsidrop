@@ -4,30 +4,29 @@ import type ObsiDropPlugin from "./main";
 import { t } from "./i18n";
 
 /**
- * Pakt placeholder-notities op die Android v0.6.0+ via Syncthing binnenstuurt
- * (gekenmerkt door `<!-- obsidrop-preview: pending -->` of het oudere
- * `diexar-preview`-formaat) en die de Android-side `PreviewWorker` om wat voor
- * reden ook niet kon afronden — bv. omdat de telefoon offline was, de batterij
- * leeg ging, of WorkManager-retries op zijn.
+ * Picks up placeholder notes sent by Android v0.6.0+ via Syncthing
+ * (identified by `<!-- obsidrop-preview: pending -->` or the older
+ * `diexar-preview` format) that the Android-side `PreviewWorker` could not
+ * finish for whatever reason — e.g. the phone was offline, battery died,
+ * or WorkManager retries were exhausted.
  *
- * Strategie: rescue alleen als de file-mtime ouder is dan `MIN_RESCUE_AGE_MS`.
- * Bij elke modify-event wordt de timer-deadline opnieuw berekend a.d.h.v. de
- * verse mtime — Android's eigen OG-update bumpt de mtime en reset zo onze
- * wachttijd, waardoor we hun verse versie nooit overrulen. Voorkomt
- * Syncthing-conflicts bij trage OG-endpoints (TikTok-oEmbed loopt soms
- * 30s+).
+ * Strategy: rescue only when the file mtime is older than `MIN_RESCUE_AGE_MS`.
+ * On every modify event the timer deadline is recalculated from the fresh
+ * mtime — Android's own OG update bumps mtime and thereby resets our wait
+ * time, so we never overwrite their fresh version. Prevents Syncthing
+ * conflicts with slow OG endpoints (TikTok oEmbed sometimes runs 30s+).
  */
 
-// Accepteer beide markers — `diexar-preview` blijft erin voor placeholders die
-// van een oudere Android-build (vóór de rename) zijn binnengekomen.
+// Accept both markers — `diexar-preview` is kept for placeholders that arrived
+// from an older Android build (before the rename).
 const PENDING_MARKER_REGEX = /<!--\s*(?:obsidrop|diexar)-preview:\s*pending\s*-->/;
 function hasPendingMarker(content: string): boolean {
   return PENDING_MARKER_REGEX.test(content);
 }
 
-// Marker moet minstens 5 min oud zijn (volgens file-mtime) voor we ingrijpen.
-// Geeft Android ruim baan om z'n eigen PreviewWorker af te ronden, ook bij
-// trage OG-endpoints + Syncthing-propagatie-vertraging.
+// Marker must be at least 5 min old (by file mtime) before we intervene.
+// Gives Android plenty of room to finish its own PreviewWorker, even with
+// slow OG endpoints + Syncthing propagation delay.
 const MIN_RESCUE_AGE_MS = 5 * 60 * 1000;
 
 export class PreviewRescue {
@@ -41,8 +40,8 @@ export class PreviewRescue {
     this.plugin.registerEvent(vault.on("modify", this.onChange));
     this.plugin.registerEvent(vault.on("delete", this.onDelete));
 
-    // Bij plugin-load: scan bestaande pending-notities. Kunnen via Syncthing
-    // zijn binnengekomen toen plugin uit was.
+    // On plugin load: scan existing pending notes. May have arrived via
+    // Syncthing while the plugin was off.
     this.plugin.app.workspace.onLayoutReady(() => {
       void this.scanExisting();
     });
@@ -70,8 +69,8 @@ export class PreviewRescue {
   }
 
   /**
-   * Probeert nu meteen alle pending-notities op te halen, zonder de 15s
-   * wachttijd. Handig voor handmatige test/debug via een command.
+   * Attempts to rescue all pending notes immediately, without the 15s wait.
+   * Useful for manual testing/debugging via a command.
    */
   async rescueAllNow(): Promise<number> {
     const files = this.plugin.app.vault.getMarkdownFiles();
@@ -111,17 +110,17 @@ export class PreviewRescue {
       }
       return;
     }
-    // Bij modify event: oude timer cancellen en opnieuw plannen met verse
-    // mtime — Android-OG-updates resetten zo onze wachttijd, en daarmee de
-    // race die Syncthing-conflicts veroorzaakt.
+    // On modify event: cancel the old timer and reschedule with the fresh
+    // mtime — Android OG updates thereby reset our wait time, and with it
+    // the race that causes Syncthing conflicts.
     const existing = this.pending.get(file.path);
     if (existing != null) {
       window.clearTimeout(existing);
       this.pending.delete(file.path);
     }
     const age = Date.now() - file.stat.mtime;
-    // Minimum 1s wachten om snelle burst-events te debouncen; max = de
-    // resterende tijd tot mtime + MIN_RESCUE_AGE_MS.
+    // Wait at least 1s to debounce rapid burst events; max = the remaining
+    // time until mtime + MIN_RESCUE_AGE_MS.
     const wait = Math.max(MIN_RESCUE_AGE_MS - age, 1_000);
     const timer = window.setTimeout(() => {
       this.pending.delete(file.path);
@@ -137,10 +136,10 @@ export class PreviewRescue {
     } catch {
       return;
     }
-    if (!hasPendingMarker(content)) return; // Android was 'm voor.
+    if (!hasPendingMarker(content)) return; // Android got there first.
 
-    // Mtime kan tijdens onze fetch opnieuw zijn ververst door een binnenkomende
-    // Syncthing-update — re-plan i.p.v. doorgaan, anders alsnog conflict-risico.
+    // Mtime may have been refreshed during our fetch by an incoming
+    // Syncthing update — reschedule instead of continuing, otherwise conflict risk.
     if (Date.now() - file.stat.mtime < MIN_RESCUE_AGE_MS) {
       void this.maybeSchedule(file);
       return;
@@ -153,8 +152,8 @@ export class PreviewRescue {
     const preview = await fetchOg(this.plugin.app, attachmentsFolder, url);
     if (!preview) return;
 
-    // Race-check: lees nog een keer vlak voor de write — als de marker tussen
-    // fetch en write verdween, niet overschrijven.
+    // Race check: read once more just before the write — if the marker
+    // disappeared between fetch and write, do not overwrite.
     let latest: string;
     try {
       latest = await this.plugin.app.vault.read(file);
@@ -167,7 +166,7 @@ export class PreviewRescue {
     try {
       await this.plugin.app.vault.modify(file, newContent);
     } catch (e) {
-      console.error("ObsiDrop preview-rescue: write faalde voor", file.path, e);
+      console.error("ObsiDrop preview-rescue: write failed for", file.path, e);
     }
   }
 }

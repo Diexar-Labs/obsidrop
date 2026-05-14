@@ -6,9 +6,9 @@ import builtins from "builtin-modules";
 
 const prod = process.argv[2] === "production";
 
-// Plugin-install-locatie in de vault. Override via OBSIDROP_VAULT_PLUGIN_DIR env-var
-// als je een andere vault gebruikt. Skip-stilletjes-als-pad-ontbreekt voorkomt
-// build-failures op CI of bij een verse clone zonder lokale vault.
+// Plugin install location in the vault. Override via OBSIDROP_VAULT_PLUGIN_DIR env var
+// if you use a different vault. Silently skips if the path doesn't exist, preventing
+// build failures on CI or fresh clones without a local vault.
 const VAULT_PLUGIN_DIR =
   process.env.OBSIDROP_VAULT_PLUGIN_DIR ||
   process.env.DIEXAR_VAULT_PLUGIN_DIR ||
@@ -16,7 +16,7 @@ const VAULT_PLUGIN_DIR =
 
 function copyToVault() {
   if (!fs.existsSync(VAULT_PLUGIN_DIR)) {
-    console.log(`[deploy] skip — vault-pluginmap bestaat niet: ${VAULT_PLUGIN_DIR}`);
+    console.log(`[deploy] skip — vault plugin directory not found: ${VAULT_PLUGIN_DIR}`);
     return;
   }
   const files = ["main.js", "manifest.json", "styles.css"];
@@ -25,15 +25,15 @@ function copyToVault() {
     try {
       fs.copyFileSync(f, path.join(VAULT_PLUGIN_DIR, f));
     } catch (e) {
-      console.error(`[deploy] kon ${f} niet kopiëren:`, e.message);
+      console.error(`[deploy] failed to copy ${f}:`, e.message);
     }
   }
-  console.log(`[deploy] gekopieerd naar ${VAULT_PLUGIN_DIR}`);
+  console.log(`[deploy] copied to ${VAULT_PLUGIN_DIR}`);
 }
 
-// esbuild-plugin: roept copyToVault() na elke succesvolle build aan, zowel in
-// production als in watch-mode. Reload Obsidian (Ctrl+R) of toggle de plugin
-// om de nieuwe bundle te zien.
+// esbuild plugin: calls copyToVault() after every successful build, in both
+// production and watch mode. Reload Obsidian (Ctrl+R) or toggle the plugin
+// to pick up the new bundle.
 const deployPlugin = {
   name: "obsidrop-deploy",
   setup(build) {

@@ -1,22 +1,22 @@
 import { App, normalizePath, requestUrl } from "obsidian";
 
 /**
- * OG-meta-fetcher voor de plugin. Spiegel van de Android-OgFetcher zodat
- * URL's die in de quick-capture zijn ingevoerd dezelfde thumbnail krijgen
- * als wanneer ze via de share-flow op de telefoon binnenkomen.
+ * OG meta fetcher for the plugin. Mirror of the Android OgFetcher so that
+ * URLs entered in quick-capture get the same thumbnail as when they arrive
+ * via the share flow on the phone.
  *
- * Gebruikt Obsidian's `requestUrl` (geen CORS in Electron) en schrijft
- * gedownloade afbeeldingen naar `<notesFolder>/.attachments/<hash>.<ext>` —
- * exact dezelfde conventie en SHA-1-naamgeving als Android, dus Syncthing
- * deduplicates automatisch en de plugin's display-flow vindt de file.
+ * Uses Obsidian's `requestUrl` (no CORS in Electron) and writes downloaded
+ * images to `<notesFolder>/.attachments/<hash>.<ext>` — the exact same
+ * convention and SHA-1 naming as Android, so Syncthing deduplicates
+ * automatically and the plugin's display flow finds the file.
  */
 
-// Desktop Chrome — Cloudflare/WAF-stacks tweaken bot-scores hoger op mobile UA's
-// dan op desktop, dus desktop voorop is bewust.
+// Desktop Chrome — Cloudflare/WAF stacks score mobile UAs higher as bots
+// than desktop, so desktop first is deliberate.
 const CHROME_UA =
   "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.6478.127 Safari/537.36";
 
-// Volgorde matters: Telegraaf 403't iedereen behalve Twitterbot.
+// Order matters: Telegraaf 403s everyone except Twitterbot.
 const FALLBACK_UAS = [
   "Twitterbot/1.0",
   "facebookexternalhit/1.1 (+http://www.facebook.com/externalhit_uatext.php)",
@@ -39,10 +39,9 @@ export function detectUrl(text: string): string | null {
 }
 
 /**
- * Alle unieke `http(s)://`-URL's in volgorde van voorkomen, na strippen van
- * embed-syntax zodat lokale image-paden niet matchen. Wordt door de capture-flow
- * gebruikt om OG-fallback te doen: probeer eerste URL → bij geen image, probeer
- * volgende, enz.
+ * All unique `http(s)://` URLs in order of occurrence, after stripping embed
+ * syntax so local image paths do not match. Used by the capture flow for OG
+ * fallback: try first URL → if no image, try next, etc.
  */
 export function detectAllUrls(text: string): string[] {
   const cleaned = text
@@ -67,9 +66,9 @@ export async function fetchOg(
 ): Promise<OgPreview | null> {
   try {
     if (/tiktok\.com/i.test(url)) {
-      // vm./vt.-shortlinks accepteert het oEmbed-endpoint niet — die hangt dan
-      // 10+ seconden voor 'ie opgeeft. Resolve eerst naar de canonieke URL via
-      // de redirect-target's `<link rel="canonical">` of `og:url`.
+      // vm./vt. shortlinks do not accept the oEmbed endpoint — it hangs for
+      // 10+ seconds before giving up. Resolve to the canonical URL first via
+      // the redirect target's `<link rel="canonical">` or `og:url`.
       const canonical = /vm\.tiktok\.com|vt\.tiktok\.com/i.test(url)
         ? await resolveCanonicalUrl(url)
         : url;
@@ -97,7 +96,7 @@ export async function fetchOg(
     }
 
     if (!html) {
-      console.warn(`ObsiDrop: kon geen HTML ophalen voor ${url} (${errors.join("; ")})`);
+      console.warn(`ObsiDrop: could not fetch HTML for ${url} (${errors.join("; ")})`);
       return null;
     }
 
@@ -121,15 +120,15 @@ export async function fetchOg(
 
     return { sourceUrl: url, title, description, imageBasename };
   } catch (e) {
-    console.error("ObsiDrop: OG-fetch faalde:", e);
+    console.error("ObsiDrop: OG-fetch failed:", e);
     return null;
   }
 }
 
 /**
- * Volgt vm./vt.tiktok.com-shortlinks naar de canonieke `/@user/video/<id>`-URL.
- * Obsidian's `requestUrl` volgt 3xx automatisch — we extraheren daarna de
- * canonical-link of og:url meta uit de uiteindelijke HTML.
+ * Follows vm./vt.tiktok.com shortlinks to the canonical `/@user/video/<id>` URL.
+ * Obsidian's `requestUrl` follows 3xx automatically — we then extract the
+ * canonical link or og:url meta from the final HTML.
  */
 async function resolveCanonicalUrl(shortUrl: string): Promise<string> {
   try {
@@ -187,13 +186,14 @@ async function fetchTikTokOEmbed(
 type DownloadResult = { html: string } | { error: string };
 
 /**
- * Chrome-fingerprint headers — Cloudflare/WAF-stacks weigeren sobere requests
- * (alleen UA + Accept) en geven 403 terug voordat de bytes überhaupt geserveerd
- * worden. Met de volledige `sec-ch-ua-*` + `sec-fetch-*` set passeren we de
- * default-bot-regels. Wordt voor zowel HTML-scrapes als image-downloads gebruikt.
+ * Chrome-fingerprint headers — Cloudflare/WAF stacks reject bare requests
+ * (UA + Accept only) and return 403 before bytes are even served.
+ * With the full `sec-ch-ua-*` + `sec-fetch-*` set we pass the default bot rules.
+ * Used for both HTML scrapes and image downloads.
  *
- * Accept-Encoding zetten we *niet*: Electron's requestUrl regelt decompressie
- * automatisch, en handmatig zetten levert op sommige builds gzipped bytes op.
+ * Accept-Encoding is deliberately NOT set: Electron's requestUrl handles
+ * decompression automatically, and setting it manually produces raw gzipped
+ * bytes on some builds.
  */
 function browserHeaders(
   userAgent: string,
@@ -247,7 +247,7 @@ async function downloadImage(
     try {
       await app.vault.adapter.mkdir(folder);
     } catch {
-      // Bestaat al — adapter.mkdir gooit op sommige builds, negeren is veilig.
+      // Already exists — adapter.mkdir throws on some builds, ignoring is safe.
     }
 
     const base = await hashName(imageUrl);
@@ -265,14 +265,14 @@ async function downloadImage(
     });
     const res = await requestUrl({ url: imageUrl, method: "GET", headers, throw: false });
     if (res.status < 200 || res.status >= 300) {
-      console.warn(`ObsiDrop: image-download faalde voor ${imageUrl} (HTTP ${res.status})`);
+      console.warn(`ObsiDrop: image download failed for ${imageUrl} (HTTP ${res.status})`);
       return null;
     }
 
     await app.vault.adapter.writeBinary(path, res.arrayBuffer);
     return filename;
   } catch (e) {
-    console.error("ObsiDrop: image-download faalde:", e);
+    console.error("ObsiDrop: image download failed:", e);
     return null;
   }
 }
@@ -299,10 +299,10 @@ function rewriteForScraping(url: string): string {
 }
 
 /**
- * Verzamelt álle image-kandidaten in prioriteitsvolgorde. Sites zetten soms
- * een `og:image` die 404't (zie holagestoria.es) — we moeten dan kunnen
- * terugvallen op twitter:image, JSON-LD of de apple-touch-icon. Duplicates
- * worden eruit gefilterd zodat we niet twee keer dezelfde 404 ophalen.
+ * Collects all image candidates in priority order. Sites sometimes set an
+ * `og:image` that 404s (see holagestoria.es) — we must then be able to fall
+ * back to twitter:image, JSON-LD or the apple-touch-icon. Duplicates are
+ * filtered out so we do not fetch the same 404 twice.
  */
 function findOgImageCandidates(html: string, pageUrl: string): string[] {
   const sources = [
@@ -327,9 +327,9 @@ function findOgImageCandidates(html: string, pageUrl: string): string[] {
 }
 
 /**
- * Schema.org JSON-LD-blokken kunnen een `image`-veld bevatten — string, object
- * met `url`, of een array van een van beide. We wandelen de boom recursief af
- * tot de eerste string-URL.
+ * Schema.org JSON-LD blocks can contain an `image` field — string, object
+ * with `url`, or an array of either. We walk the tree recursively
+ * until the first string URL.
  */
 function extractJsonLdImage(html: string): string | null {
   const scriptRe = /<script[^>]+type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi;
@@ -380,14 +380,13 @@ function walkForJsonLdImage(node: unknown): string | null {
 }
 
 /**
- * Allerlaatste redmiddel — sommige sites (zie holagestoria.es) hebben
- * álle meta-images kapot of niet-bestaand. Dan pakken we de eerste
- * niet-triviale `<img>` uit de body, wat meestal het logo of de hero-image
- * is. Filters tegen ruis: data-URIs (inline base64), SVG's (geen JPG/PNG
- * dus onze extension-guesser werkt niet), tracking-pixels en spinners.
+ * Last resort — some sites (see holagestoria.es) have all meta images broken
+ * or missing. We then take the first non-trivial `<img>` from the body, which
+ * is usually the logo or hero image. Filters against noise: data URIs (inline
+ * base64), SVGs (no JPG/PNG so our extension guesser does not work), tracking
+ * pixels and spinners.
  *
- * We zoeken eerst in `<body>` om te voorkomen dat een favicon uit `<head>`
- * als img wordt teruggegeven.
+ * We search in `<body>` first to prevent a favicon from `<head>` being returned.
  */
 function extractFirstBodyImage(html: string, pageUrl: string): string | null {
   const bodyMatch = html.match(/<body\b[\s\S]*$/i);
@@ -408,10 +407,10 @@ function extractFirstBodyImage(html: string, pageUrl: string): string | null {
 }
 
 /**
- * Filtert third-party img-tags (Google-loginknoppen, Facebook-pixels, etc.) uit
- * de body-scrape. Relatieve URL's zijn per definitie same-site. Voor absolute
- * URL's vergelijken we hostnames met `www.`-prefix gestript, en accepteren we
- * subdomeinen (een CDN op `cdn.holagestoria.es` is nog steeds van die site).
+ * Filters out third-party img tags (Google login buttons, Facebook pixels, etc.)
+ * from the body scrape. Relative URLs are by definition same-site. For absolute
+ * URLs we compare hostnames with the `www.` prefix stripped, and accept
+ * subdomains (a CDN at `cdn.holagestoria.es` still belongs to that site).
  */
 function isSameSite(imageSrc: string, pageUrl: string): boolean {
   if (!/^https?:\/\//i.test(imageSrc)) return true;
@@ -429,9 +428,9 @@ function isSameSite(imageSrc: string, pageUrl: string): boolean {
 }
 
 /**
- * Laatste redmiddel voor sites zonder OG/Twitter-meta: de apple-touch-icon.
- * WordPress genereert die standaard op 180x180, dus ziet er nog acceptabel uit
- * als card-thumbnail. Beter dan een lege kaart.
+ * Last resort for sites without OG/Twitter meta: the apple-touch-icon.
+ * WordPress generates it at 180x180 by default, so it still looks acceptable
+ * as a card thumbnail. Better than an empty card.
  */
 function extractAppleTouchIcon(html: string): string | null {
   const p1 = /<link[^>]+?rel\s*=\s*["']apple-touch-icon(?:-precomposed)?["'][^>]*?href\s*=\s*["']([^"']+)["']/i;
@@ -508,10 +507,10 @@ function guessExtensionFromUrl(url: string): string | null {
 }
 
 /**
- * Bouw een markdown-notitie uit een OG-preview. Spiegel van Android's `buildLinkNote`.
- * Als `userContent` exact gelijk is aan de URL (gebruiker plakte alleen een URL),
- * vervangen we 'm door een volledige link-notitie. Anders prependen we alleen
- * het image-embed (indien gevonden) zodat user-tekst behouden blijft.
+ * Builds a markdown note from an OG preview. Mirror of Android's `buildLinkNote`.
+ * If `userContent` is exactly equal to the URL (user pasted only a URL),
+ * we replace it with a full link note. Otherwise we only prepend the image
+ * embed (if found) so the user's text is preserved.
  */
 export function buildLinkNote(url: string, preview: OgPreview, userContent: string): string {
   const trimmedUser = userContent.trim();

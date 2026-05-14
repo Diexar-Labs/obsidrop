@@ -101,7 +101,7 @@ export class ObsiDropView extends ItemView {
     this.gridEl = root.createDiv({ cls: "obsidrop-grid" });
     this.applyCardWidth();
 
-    // Escape verlaat selection-mode (pendant van Android's BackHandler).
+    // Escape exits selection mode (counterpart of Android's BackHandler).
     this.registerDomEvent(document, "keydown", (ev: KeyboardEvent) => {
       if (ev.key === "Escape" && this.selectionMode) {
         ev.preventDefault();
@@ -185,15 +185,15 @@ export class ObsiDropView extends ItemView {
     if (this.selectedPaths.has(path)) this.selectedPaths.delete(path);
     else this.selectedPaths.add(path);
     if (this.selectedPaths.size === 0) {
-      // Auto-exit als laatste deselect — pendant van Android-gedrag.
+      // Auto-exit on last deselect — counterpart of Android behavior.
       this.exitSelection();
       return;
     }
     this.updateSelectionToolbar();
-    // Update alleen de getroffen kaart visueel ipv volledige re-render —
-    // anders verliest de gebruiker scroll-positie bij elke toggle. Loopen
-    // is robuuster dan een attribute-selector op file-paden (bevatten
-    // slashes, punten en mogelijk quotes die CSS-escape lastig maken).
+    // Update only the affected card visually instead of a full re-render —
+    // otherwise the user loses scroll position on every toggle. Looping
+    // is more robust than an attribute selector on file paths (which contain
+    // slashes, dots and possibly quotes that are awkward to CSS-escape).
     const cards = this.gridEl.querySelectorAll<HTMLElement>(".obsidrop-card");
     for (const c of Array.from(cards)) {
       if (c.dataset.path === path) {
@@ -259,15 +259,15 @@ export class ObsiDropView extends ItemView {
   }
 
   private async bulkArchive(): Promise<void> {
-    // Snapshot van paden — selectie kan tijdens de operatie wijzigen
-    // (al onwaarschijnlijk) en we willen sequentieel werken.
+    // Snapshot of paths — selection may change during the operation
+    // (unlikely) and we want to work sequentially.
     const paths = Array.from(this.selectedPaths);
     const archiveFolder = normalizePath(this.plugin.settings.archiveFolder);
     if (!this.app.vault.getAbstractFileByPath(archiveFolder)) {
       try {
         await this.app.vault.createFolder(archiveFolder);
       } catch {
-        // Bestaat misschien al; rename hieronder faalt anders alsnog netjes per file.
+        // May already exist; the rename below will still fail gracefully per file.
       }
     }
     let ok = 0;
@@ -305,8 +305,8 @@ export class ObsiDropView extends ItemView {
         continue;
       }
       try {
-        // System-trash i.p.v. .trash/ — zo komt het in OS-prullenbak en is
-        // herstel mogelijk; aligned met de single-card delete-flow.
+        // System trash instead of .trash/ — puts it in the OS recycle bin so
+        // recovery is possible; aligned with the single-card delete flow.
         await this.app.vault.trash(file, true);
         ok++;
       } catch {
@@ -318,11 +318,10 @@ export class ObsiDropView extends ItemView {
   }
 
   /**
-   * Long-press detectie via pointer-events (werkt voor muis én touch).
-   * Timer start op pointerdown, cancelt bij beweging > drempel of pointerup.
-   * Bij vuren: enter selection-mode (of toggle als al actief). Het daarop
-   * volgende click-event wordt in capture-phase opgegeten zodat de
-   * normale klik-handlers niet ook nog vuren.
+   * Long-press detection via pointer events (works for mouse and touch).
+   * Timer starts on pointerdown, cancels on movement > threshold or pointerup.
+   * On fire: enter selection mode (or toggle if already active). The subsequent
+   * click event is consumed in the capture phase so normal click handlers do not also fire.
    */
   private attachLongPress(cardEl: HTMLElement, path: string): void {
     let timer: number | null = null;
@@ -338,7 +337,7 @@ export class ObsiDropView extends ItemView {
     };
 
     cardEl.addEventListener("pointerdown", (e: PointerEvent) => {
-      // Alleen primaire knop / touch / pen — rechts-klik laten met rust.
+      // Primary button / touch / pen only — leave right-click alone.
       if (e.button !== 0 && e.pointerType === "mouse") return;
       startX = e.clientX;
       startY = e.clientY;
@@ -369,7 +368,7 @@ export class ObsiDropView extends ItemView {
       "click",
       (e) => {
         if (fired) {
-          // Long-press heeft al actie ondernomen; eet de daaropvolgende click.
+          // Long-press already acted; consume the subsequent click.
           fired = false;
           e.stopPropagation();
           e.preventDefault();
@@ -407,8 +406,8 @@ export class ObsiDropView extends ItemView {
     const cards = await this.collectCards();
     this.renderFilterBar(cards);
 
-    // Drop selected-tags die door note-mutaties niet meer bestaan, zodat
-    // de gebruiker niet vast komt te zitten met een "dood" filter.
+    // Drop selected tags that no longer exist after note mutations, so the
+    // user cannot get stuck with a "dead" filter.
     const tagFreq = computeTagFrequency(cards);
     for (const sel of Array.from(this.selectedTags)) {
       if (!tagFreq.has(sel)) this.selectedTags.delete(sel);
@@ -417,10 +416,10 @@ export class ObsiDropView extends ItemView {
     const filtered = cards.filter((c) => this.matchesFilters(c));
     this.lastFiltered = filtered;
 
-    // Drop selected-paths die buiten de huidige filtered-set vallen of
-    // niet meer bestaan, anders telt "N geselecteerd" verkeerd na een filter-
-    // wijziging of file-delete. (Selection-mode zelf blijft staan tot de
-    // gebruiker × of Escape gebruikt.)
+    // Drop selected paths that are outside the current filtered set or no
+    // longer exist, otherwise "N selected" counts incorrectly after a filter
+    // change or file deletion. (Selection mode itself stays until the user
+    // presses × or Escape.)
     const allPaths = new Set(cards.map((c) => c.file.path));
     for (const p of Array.from(this.selectedPaths)) {
       if (!allPaths.has(p)) this.selectedPaths.delete(p);
@@ -463,10 +462,10 @@ export class ObsiDropView extends ItemView {
   }
 
   /**
-   * Bouwt de tag-chip-strip onder de toolbar: top-N op frequentie + altijd
-   * óók geselecteerde tags die buiten de top vallen (anders zou een
-   * geselecteerde tag verdwijnen na een nieuwe note met andere tags).
-   * Toon "+N meer"-chip wanneer er nog tags overblijven; opent TagPickerModal.
+   * Builds the tag-chip strip below the toolbar: top-N by frequency + always
+   * also any selected tags that fall outside the top (otherwise a selected tag
+   * would disappear after a new note with different tags is added).
+   * Shows a "+N more" chip when tags remain; opens TagPickerModal.
    */
   private renderFilterBar(cards: CardData[]): void {
     if (!this.filterBarEl) return;
@@ -529,8 +528,8 @@ export class ObsiDropView extends ItemView {
     const chip = this.filterBarEl.createEl("button", {
       cls: `obsidrop-filter-chip${isSelected ? " is-selected" : ""}`,
     });
-    // Expliciet ✓-symbool — kleur alléén volstaat niet (kleurenblind-pariteit
-    // met de Android-FilterChip die ook een Done-icon toont).
+    // Explicit ✓ symbol — color alone is insufficient (color-blind parity
+    // with the Android FilterChip that also shows a Done icon).
     const check = chip.createSpan({ cls: "obsidrop-filter-chip-check" });
     check.setText(isSelected ? "✓" : "");
     chip.createSpan({ cls: "obsidrop-filter-chip-label", text: `#${tag}` });
@@ -580,8 +579,8 @@ export class ObsiDropView extends ItemView {
   }
 
   /**
-   * AND tussen zoektekst en tag-filter; OR binnen geselecteerde tags
-   * (een notitie matched zodra één van de geselecteerde tags er op zit).
+   * AND between search text and tag filter; OR within selected tags
+   * (a note matches as soon as it has at least one of the selected tags).
    */
   private matchesFilters(card: CardData): boolean {
     const q = this.query;
@@ -614,9 +613,9 @@ export class ObsiDropView extends ItemView {
 
     this.attachLongPress(cardEl, file.path);
 
-    // Selectie-marker overlay (rechtsboven). Shape-based (gevuld vs leeg
-    // cirkel-icoon) zodat ook zonder kleurperceptie zichtbaar is welke
-    // kaart geselecteerd is. Verschijnt alleen in selection-mode via CSS.
+    // Selection-marker overlay (top-right). Shape-based (filled vs empty
+    // circle icon) so selected state is visible without color perception.
+    // Shown only in selection mode via CSS.
     const marker = cardEl.createSpan({ cls: "obsidrop-card-select-marker" });
     setIcon(marker, isSelected ? "check-circle-2" : "circle");
 
@@ -631,9 +630,9 @@ export class ObsiDropView extends ItemView {
       ? this.resolveAttachmentResource(file, thumbnailBasename)
       : null;
 
-    // Body-klik = altijd bewerken (of: toggle wanneer in selection-mode).
-    // Thumbnail krijgt z'n eigen handler met stopPropagation voor de
-    // lightbox, anders kan de gebruiker niet meer bij de tekst van de kaart.
+    // Body click = always edit (or toggle when in selection mode).
+    // Thumbnail gets its own handler with stopPropagation for the lightbox,
+    // otherwise the user can no longer reach the card's text.
     body.addEventListener("click", () => {
       if (this.selectionMode) { this.toggleSelect(file.path); return; }
       new EditNoteModal(this.app, this.plugin, file).open();
@@ -645,7 +644,7 @@ export class ObsiDropView extends ItemView {
       img.src = attachment.resourcePath;
       img.alt = "";
       img.loading = "lazy";
-      // Als het bestand niet bestaat (broken link), verberg de thumbnail-wrap.
+      // If the file does not exist (broken link), hide the thumbnail wrapper.
       img.addEventListener("error", () => thumbWrap.remove());
       thumbWrap.addEventListener("click", (e) => {
         e.stopPropagation();
@@ -703,8 +702,8 @@ export class ObsiDropView extends ItemView {
           attr: { href: url, rel: "noopener noreferrer", title: url },
         });
         chip.addEventListener("click", (e) => {
-          // Klik op chip = link openen, niet de edit-modal triggeren.
-          // In selection-mode wordt 'ie alsnog een toggle voor de kaart.
+          // Click on chip = open link, not trigger the edit modal.
+          // In selection mode it becomes a toggle for the card instead.
           e.stopPropagation();
           e.preventDefault();
           if (this.selectionMode) { this.toggleSelect(file.path); return; }
@@ -718,8 +717,8 @@ export class ObsiDropView extends ItemView {
           attr: { title: t("link_chip_more_tooltip") },
         });
         more.addEventListener("click", (e) => {
-          // "+N" doorgeven aan kaart-klik → edit-modal toont volledige inhoud.
-          // Niet stoppen.
+          // "+N" passes through to the card click → edit modal shows full content.
+          // Do not stop.
           void e;
         });
       }
@@ -894,7 +893,7 @@ export class ObsiDropView extends ItemView {
     const rect = anchor.getBoundingClientRect();
     bar.style.position = "fixed";
     bar.style.zIndex = "9999";
-    // Tijdelijk renderen om de bar-breedte te kennen, dan correct positioneren.
+    // Render temporarily to know the bar width, then position correctly.
     const barRect = bar.getBoundingClientRect();
     const left = Math.max(
       8,
@@ -915,8 +914,8 @@ export class ObsiDropView extends ItemView {
           .setTitle(colorLabel(name))
           .setIcon(name === meta.color ? "check" : "circle")
           .onClick(async () => {
-            // In-place update: voorkomt dat re-rendering de kaart bovenaan zet
-            // doordat updateMeta de mtime bumpt en de grid hersorteert.
+            // In-place update: prevents re-rendering from moving the card to
+            // the top because updateMeta bumps mtime and the grid re-sorts.
             this.plugin.suppressModifyOnce(file.path);
             await updateMeta(this.app, file, { color: name });
             meta.color = name;
@@ -932,13 +931,13 @@ export class ObsiDropView extends ItemView {
   }
 
   /**
-   * Resolveer een ingebedde afbeelding naar een resource-path dat als `<img src>` werkt.
+   * Resolves an embedded image to a resource path usable as `<img src>`.
    *
-   * 1. Probeer Obsidian's metadataCache (vindt standaard-attachments via vault-zoek).
-   * 2. Fall back op `<note-folder>/.attachments/<basename>` — Obsidian's metadataCache
-   *    slaat dot-prefixed mappen over (`.attachments/`, `.trash/`), maar de adapter zelf
-   *    kan ze wél lezen. Android-deelflow gebruikt deze conventie.
-   * 3. Fall back op `<notesFolder>/.attachments/<basename>` (geconfigureerde notitiemap).
+   * 1. Try Obsidian's metadataCache (finds standard attachments via vault lookup).
+   * 2. Fall back to `<note-folder>/.attachments/<basename>` — Obsidian's metadataCache
+   *    skips dot-prefixed folders (`.attachments/`, `.trash/`), but the adapter itself
+   *    can read them. The Android share flow uses this convention.
+   * 3. Fall back to `<notesFolder>/.attachments/<basename>` (configured notes folder).
    */
   private resolveAttachmentResource(
     noteFile: TFile,
@@ -962,8 +961,8 @@ export class ObsiDropView extends ItemView {
     }
     for (const p of candidates) {
       const normalized = normalizePath(p);
-      // Adapter-resource werkt ook voor dot-prefixed mappen die metadataCache overslaat.
-      // Bestaan-check is async — img.onerror ruimt op bij fail.
+      // Adapter resource also works for dot-prefixed folders that metadataCache skips.
+      // Existence check is async — img.onerror cleans up on failure.
       return {
         resourcePath: this.app.vault.adapter.getResourcePath(normalized),
         file: null,
@@ -974,8 +973,8 @@ export class ObsiDropView extends ItemView {
   }
 
   /**
-   * Verplaatst de notitie naar een andere map. Daarna valt 'ie buiten
-   * `notesFolder` → verdwijnt automatisch uit de view bij refresh.
+   * Moves the note to a different folder. Afterwards it falls outside
+   * `notesFolder` → disappears automatically from the view on refresh.
    */
   private async moveNote(file: TFile, targetFolder: string): Promise<void> {
     const target = normalizePath(`${targetFolder}/${file.name}`);
@@ -994,9 +993,9 @@ export class ObsiDropView extends ItemView {
   }
 
   /**
-   * Maakt een kopie van de notitie in een andere map. Origineel blijft in
-   * `notesFolder` staan; embedded attachments worden NIET mee-gekopieerd
-   * (de wikilinks blijven werken omdat het dezelfde vault is).
+   * Makes a copy of the note in a different folder. The original stays in
+   * `notesFolder`; embedded attachments are NOT copied (wikilinks keep working
+   * because it is the same vault).
    */
   private async copyNote(file: TFile, targetFolder: string): Promise<void> {
     const target = normalizePath(`${targetFolder}/${file.name}`);
@@ -1025,18 +1024,18 @@ export class ObsiDropView extends ItemView {
       if (currentlyArchived) {
         const newPath = normalizePath(`${notesFolder}/${file.name}`);
         await this.app.fileManager.renameFile(file, newPath);
-        new Notice(`Hersteld uit archief: ${file.basename}`);
+        new Notice(`Restored from archive: ${file.basename}`);
       } else {
         if (!this.app.vault.getAbstractFileByPath(archiveFolder)) {
           await this.app.vault.createFolder(archiveFolder);
         }
         const newPath = normalizePath(`${archiveFolder}/${file.name}`);
         await this.app.fileManager.renameFile(file, newPath);
-        new Notice(`Gearchiveerd: ${file.basename}`);
+        new Notice(`Archived: ${file.basename}`);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      new Notice(`Fout: ${message}`);
+      new Notice(`Error: ${message}`);
     }
     this.plugin.refreshViews();
   }
@@ -1082,9 +1081,9 @@ function sortFiles(files: TFile[], mode: string): TFile[] {
 }
 
 /**
- * Title-source: eerste niet-blanke, niet-embed regel. Markdown heading-markers
- * (`#`, `*`, `_`, `` ` ``, `>`) worden gestript. Resultaat wordt afgekapt op
- * `TITLE_MAX_WORDS` met "…". Lege titel → val terug op `fallback` (filename).
+ * Title source: first non-blank, non-embed line. Markdown heading markers
+ * (`#`, `*`, `_`, `` ` ``, `>`) are stripped. Result is truncated to
+ * `TITLE_MAX_WORDS` with "…". Empty title → fall back to `fallback` (filename).
  */
 function extractTitle(content: string, fallback: string): string {
   const body = stripFrontmatter(content);
@@ -1101,9 +1100,9 @@ function extractTitle(content: string, fallback: string): string {
 }
 
 /**
- * Body voor de kaart: zonder frontmatter, embeds, heading-regels, URL's,
- * preview-comment-markers. Afgekapt op `PREVIEW_MAX_WORDS` met "…".
- * URL's worden weggehaald omdat ze als chips onderaan apart getoond worden.
+ * Body for the card: without frontmatter, embeds, heading lines, URLs,
+ * preview-comment markers. Truncated to `PREVIEW_MAX_WORDS` with "…".
+ * URLs are stripped because they are shown separately as chips at the bottom.
  */
 function extractPreview(content: string): string {
   const body = stripFrontmatter(content);
@@ -1130,8 +1129,8 @@ function truncateWords(text: string, maxWords: number): string {
 }
 
 /**
- * Verzamelt alle unieke `http(s)://`-URL's uit de body (na strippen van
- * embed-syntax zodat lokale image-paden niet meelopen). Behoudt invoegvolgorde.
+ * Collects all unique `http(s)://` URLs from the body (after stripping embed
+ * syntax so local image paths are excluded). Preserves insertion order.
  */
 function extractUrls(content: string): string[] {
   const body = stripFrontmatter(content)
@@ -1159,8 +1158,8 @@ function hostnameOf(url: string): string {
 }
 
 /**
- * Vindt de basenaam van de eerste ingebedde afbeelding in de notitie.
- * Ondersteunt zowel Obsidian-wikilinks `![[bestand.jpg]]` als markdown `![](path)`.
+ * Finds the basename of the first embedded image in the note.
+ * Supports both Obsidian wikilinks `![[file.jpg]]` and markdown `![](path)`.
  */
 function extractFirstEmbeddedImage(content: string): string | null {
   const body = stripFrontmatter(content);
@@ -1171,7 +1170,7 @@ function extractFirstEmbeddedImage(content: string): string | null {
   const md = body.match(/!\[[^\]]*\]\(([^)]+)\)/);
   if (md) {
     const url = md[1].trim();
-    // Voor lokale paden: pak de basename. Voor http(s) doen we niets (geen lokale resolve).
+    // For local paths: take the basename. For http(s) do nothing (no local resolve).
     if (/^https?:\/\//i.test(url)) return null;
     const clean = url.split("#")[0].split("?")[0];
     const parts = clean.split("/");
@@ -1180,5 +1179,5 @@ function extractFirstEmbeddedImage(content: string): string | null {
   return null;
 }
 
-// Houden voor backwards-compat in case main.ts importeerde dit. Niet meer gebruikt.
+// Kept for backwards-compat in case main.ts imported this. No longer used.
 export { DEFAULT_META };

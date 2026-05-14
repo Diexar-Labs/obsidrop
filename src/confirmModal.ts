@@ -9,9 +9,9 @@ interface ConfirmOptions {
 }
 
 /**
- * Eenvoudige ja/nee-bevestigingsmodal. Sluit met Cancel of confirm; bij
- * confirm wordt de callback aangeroepen. Pendant van Android's AlertDialog
- * met "Annuleren" + actie-knop.
+ * Simple yes/no confirmation modal. Closes on Cancel or confirm; on confirm
+ * the callback is invoked. Counterpart of Android's AlertDialog with
+ * "Cancel" + action button.
  */
 export class ConfirmModal extends Modal {
   private opts: ConfirmOptions;
