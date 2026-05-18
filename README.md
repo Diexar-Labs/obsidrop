@@ -92,11 +92,18 @@ Google Keep is great - until you remember Google reads everything you put in the
 
 ### Obsidian plugin (desktop + mobile)
 
+**Easiest — via Community plugins (recommended):**
+
+1. Open Obsidian → Settings → Community plugins → **Browse**.
+2. Search for **ObsiDrop** and click Install, then Enable.
+3. Click the sticky-note icon in the left ribbon (or run command "ObsiDrop: Open Keep view").
+
+**Manual install (for offline / pre-release versions):**
+
 1. Go to the [latest release](https://github.com/Diexar-Labs/obsidrop/releases/latest).
 2. Download `manifest.json`, `main.js`, and `styles.css`.
 3. Put them in `<your-vault>/.obsidian/plugins/obsidrop/` (create the folder if it doesn't exist).
 4. Open Obsidian → Settings → Community plugins → enable **ObsiDrop**.
-5. Click the sticky-note icon in the left ribbon (or run command "ObsiDrop: Open Keep view").
 
 ### Android app
 
@@ -170,7 +177,7 @@ UI in English (default) and Dutch. Skeletons exist for **Spanish, German, French
 - [x] Tag-filter chips + bulk-select (multi-archive / multi-delete)
 - [x] Lightbox for image embeds
 - [x] Voice memos (record + playback, both platforms)
-- [ ] Submit to official Obsidian community-plugins register
+- [x] Submit to official Obsidian community-plugins register
 - [ ] iOS share-target (share-extension)
 - [ ] Firefox / Edge clipper (the Chrome extension is MV3, should port cleanly)
 
