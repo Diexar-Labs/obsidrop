@@ -28,15 +28,15 @@ export class ConfirmModal extends Modal {
     titleEl.setText(this.opts.title);
     contentEl.createEl("p", { text: this.opts.message });
 
-    const footer = contentEl.createDiv({ cls: "obsidrop-confirm-footer" });
+    const footer = contentEl.createDiv({ cls: "jotdrop-confirm-footer" });
     const cancel = footer.createEl("button", {
-      cls: "obsidrop-confirm-cancel",
+      cls: "jotdrop-confirm-cancel",
       text: t("action_cancel"),
     });
     cancel.addEventListener("click", () => this.close());
 
     const confirm = footer.createEl("button", {
-      cls: `obsidrop-confirm-ok${this.opts.destructive ? " is-destructive" : ""}`,
+      cls: `jotdrop-confirm-ok${this.opts.destructive ? " is-destructive" : ""}`,
       text: this.opts.confirmLabel,
     });
     confirm.addEventListener("click", () => {

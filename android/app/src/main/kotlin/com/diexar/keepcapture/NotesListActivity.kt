@@ -118,7 +118,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.lifecycleScope
 import coil.compose.AsyncImage
-import com.diexar.keepcapture.ui.ObsiDropTheme
+import com.diexar.keepcapture.ui.JotDropTheme
 import com.diexar.keepcapture.ui.noteCardBrush
 import com.diexar.keepcapture.ui.screenBackgroundBrush
 import kotlinx.coroutines.Dispatchers
@@ -183,7 +183,7 @@ class NotesListActivity : ComponentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContent {
-            ObsiDropTheme {
+            JotDropTheme {
                 NotesListScreen(
                     stateFlow = notesState.asStateFlow(),
                     onRefresh = { reload() },

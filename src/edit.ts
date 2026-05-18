@@ -1,5 +1,5 @@
 import { App, Modal, Notice, SuggestModal, TFile, normalizePath } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { toggleOrInsertChecklistOnTextArea } from "./capture";
 import { LightboxModal } from "./lightbox";
 import { t } from "./i18n";
@@ -31,7 +31,7 @@ interface EditableNote {
  * processFrontMatter for metadata and vault.modify for body.
  */
 export class EditNoteModal extends Modal {
-  private plugin: ObsiDropPlugin;
+  private plugin: JotDropPlugin;
   private file: TFile;
   private state!: EditableNote;
   private originalBody = "";
@@ -40,7 +40,7 @@ export class EditNoteModal extends Modal {
   private chipsEl!: HTMLElement;
   private tagInputEl: HTMLInputElement | null = null;
 
-  constructor(app: App, plugin: ObsiDropPlugin, file: TFile) {
+  constructor(app: App, plugin: JotDropPlugin, file: TFile) {
     super(app);
     this.plugin = plugin;
     this.file = file;
@@ -48,7 +48,7 @@ export class EditNoteModal extends Modal {
 
   async onOpen(): Promise<void> {
     this.titleEl.setText(this.file.basename);
-    this.contentEl.addClass("obsidrop-edit-modal");
+    this.contentEl.addClass("jotdrop-edit-modal");
 
     const raw = await this.app.vault.read(this.file);
     const rawBody = stripFrontmatter(raw).replace(/^\n+/, "");
@@ -74,13 +74,13 @@ export class EditNoteModal extends Modal {
     const root = this.contentEl;
     root.empty();
 
-    const controls = root.createDiv({ cls: "obsidrop-edit-controls" });
+    const controls = root.createDiv({ cls: "jotdrop-edit-controls" });
     this.renderControls(controls);
 
     this.renderEmbedThumbnail(root);
 
     this.bodyEl = root.createEl("textarea", {
-      cls: "obsidrop-edit-body",
+      cls: "jotdrop-edit-body",
     });
     this.bodyEl.rows = 12;
     this.bodyEl.value = this.state.body;
@@ -88,7 +88,7 @@ export class EditNoteModal extends Modal {
       this.state.body = this.bodyEl.value;
     });
 
-    const footer = root.createDiv({ cls: "obsidrop-edit-footer" });
+    const footer = root.createDiv({ cls: "jotdrop-edit-footer" });
     const cancel = footer.createEl("button", { text: t("action_cancel") });
     cancel.addEventListener("click", () => this.close());
     const save = footer.createEl("button", { text: t("action_save"), cls: "mod-cta" });
@@ -106,17 +106,17 @@ export class EditNoteModal extends Modal {
     parent.empty();
 
     // Color picker — changes are saved immediately
-    const colorWrap = parent.createDiv({ cls: "obsidrop-edit-colorrow" });
-    colorWrap.createSpan({ text: t("label_color"), cls: "obsidrop-edit-label" });
-    const swatches = colorWrap.createDiv({ cls: "obsidrop-edit-swatches" });
+    const colorWrap = parent.createDiv({ cls: "jotdrop-edit-colorrow" });
+    colorWrap.createSpan({ text: t("label_color"), cls: "jotdrop-edit-label" });
+    const swatches = colorWrap.createDiv({ cls: "jotdrop-edit-swatches" });
     for (const name of COLOR_NAMES) {
       const sw = swatches.createDiv({
-        cls: `obsidrop-edit-swatch${name === this.state.color ? " is-active" : ""}`,
+        cls: `jotdrop-edit-swatch${name === this.state.color ? " is-active" : ""}`,
         attr: { "aria-label": colorLabel(name), title: colorLabel(name) },
       });
       sw.dataset.color = name;
       if (name === this.state.color) {
-        sw.createSpan({ cls: "obsidrop-edit-swatch-check", text: "✓" });
+        sw.createSpan({ cls: "jotdrop-edit-swatch-check", text: "✓" });
       }
       sw.addEventListener("click", async () => {
         if (this.state.color === name) return;
@@ -132,9 +132,9 @@ export class EditNoteModal extends Modal {
     }
 
     // Pin toggle — save immediately
-    const pinWrap = parent.createDiv({ cls: "obsidrop-edit-row" });
+    const pinWrap = parent.createDiv({ cls: "jotdrop-edit-row" });
     const pinBtn = pinWrap.createEl("button", {
-      cls: `obsidrop-edit-pin${this.state.pinned ? " is-active" : ""}`,
+      cls: `jotdrop-edit-pin${this.state.pinned ? " is-active" : ""}`,
       text: this.state.pinned ? t("action_unpin_btn") : t("action_pin_btn"),
     });
     pinBtn.addEventListener("click", async () => {
@@ -150,7 +150,7 @@ export class EditNoteModal extends Modal {
 
     // Link insert
     const linkBtn = pinWrap.createEl("button", {
-      cls: "obsidrop-edit-linkbtn",
+      cls: "jotdrop-edit-linkbtn",
       text: t("action_insert_link"),
     });
     linkBtn.addEventListener("click", () => {
@@ -158,7 +158,7 @@ export class EditNoteModal extends Modal {
     });
 
     const checkBtn = pinWrap.createEl("button", {
-      cls: "obsidrop-edit-linkbtn",
+      cls: "jotdrop-edit-linkbtn",
       text: t("action_checklist"),
     });
     checkBtn.addEventListener("click", () => {
@@ -167,10 +167,10 @@ export class EditNoteModal extends Modal {
     });
 
     // Reminder
-    const reminderRow = parent.createDiv({ cls: "obsidrop-edit-row obsidrop-reminder-row" });
-    reminderRow.createSpan({ text: t("label_reminder"), cls: "obsidrop-edit-label" });
+    const reminderRow = parent.createDiv({ cls: "jotdrop-edit-row jotdrop-reminder-row" });
+    reminderRow.createSpan({ text: t("label_reminder"), cls: "jotdrop-edit-label" });
     const reminderInput = reminderRow.createEl("input", {
-      cls: "obsidrop-edit-reminder",
+      cls: "jotdrop-edit-reminder",
       attr: { type: "datetime-local" },
     });
     if (this.state.reminder) reminderInput.value = this.state.reminder;
@@ -184,7 +184,7 @@ export class EditNoteModal extends Modal {
       }
     });
     const clearReminder = reminderRow.createEl("button", {
-      cls: "obsidrop-edit-linkbtn",
+      cls: "jotdrop-edit-linkbtn",
       text: t("action_clear_reminder"),
     });
     clearReminder.addEventListener("click", async () => {
@@ -200,17 +200,17 @@ export class EditNoteModal extends Modal {
 
     // Tags + chip input — input lives inside the chips container so it always
     // follows the last chip, even when chips wrap to a new line.
-    const tagWrap = parent.createDiv({ cls: "obsidrop-edit-tagrow" });
-    tagWrap.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
-    this.chipsEl = tagWrap.createDiv({ cls: "obsidrop-edit-chips" });
+    const tagWrap = parent.createDiv({ cls: "jotdrop-edit-tagrow" });
+    tagWrap.createSpan({ text: t("label_tags"), cls: "jotdrop-edit-label" });
+    this.chipsEl = tagWrap.createDiv({ cls: "jotdrop-edit-chips" });
     this.tagInputEl = null;
     this.renderChips();
 
     this.tagInputEl = this.chipsEl.createEl("input", {
-      cls: "obsidrop-edit-taginput",
+      cls: "jotdrop-edit-taginput",
       attr: { type: "text", placeholder: t("tag_input_placeholder") },
     });
-    const datalistId = `obsidrop-tagcompletion-${Date.now()}`;
+    const datalistId = `jotdrop-tagcompletion-${Date.now()}`;
     const datalist = tagWrap.createEl("datalist", { attr: { id: datalistId } });
     this.tagInputEl.setAttribute("list", datalistId);
     for (const tag of getAllVaultTags(this.app)) {
@@ -243,9 +243,9 @@ export class EditNoteModal extends Modal {
     if (!this.chipsEl) return;
     this.chipsEl.empty();
     for (const tag of this.state.tags) {
-      const chip = this.chipsEl.createSpan({ cls: "obsidrop-edit-chip" });
+      const chip = this.chipsEl.createSpan({ cls: "jotdrop-edit-chip" });
       chip.createSpan({ text: `#${tag}` });
-      const x = chip.createSpan({ cls: "obsidrop-edit-chip-x", text: "×" });
+      const x = chip.createSpan({ cls: "jotdrop-edit-chip-x", text: "×" });
       x.addEventListener("click", () => {
         this.state.tags = this.state.tags.filter((t) => t !== tag);
         this.renderChips();
@@ -284,7 +284,7 @@ export class EditNoteModal extends Modal {
     if (!resolved) return;
 
     if (/\.(m4a|mp3|wav|ogg|aac|flac|3gp|amr|webm)$/i.test(basename)) {
-      const wrap = parent.createDiv({ cls: "obsidrop-edit-audio" });
+      const wrap = parent.createDiv({ cls: "jotdrop-edit-audio" });
       const audio = wrap.createEl("audio");
       audio.controls = true;
       audio.src = resolved.resourcePath;
@@ -293,7 +293,7 @@ export class EditNoteModal extends Modal {
       return;
     }
 
-    const wrap = parent.createDiv({ cls: "obsidrop-edit-thumbnail" });
+    const wrap = parent.createDiv({ cls: "jotdrop-edit-thumbnail" });
     const img = wrap.createEl("img");
     img.src = resolved.resourcePath;
     img.alt = "";
@@ -391,7 +391,7 @@ export class InsertLinkModal extends SuggestModal<TFile> {
 
   renderSuggestion(value: TFile, el: HTMLElement): void {
     el.createDiv({ text: value.basename });
-    el.createDiv({ cls: "obsidrop-suggest-path", text: value.path });
+    el.createDiv({ cls: "jotdrop-suggest-path", text: value.path });
   }
 
   onChooseSuggestion(item: TFile): void {

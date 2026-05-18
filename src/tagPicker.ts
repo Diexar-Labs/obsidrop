@@ -37,10 +37,10 @@ export class TagPickerModal extends Modal {
   onOpen(): void {
     const { contentEl, titleEl } = this;
     titleEl.setText(t("tag_sheet_title"));
-    contentEl.addClass("obsidrop-tagpicker");
+    contentEl.addClass("jotdrop-tagpicker");
 
     this.inputEl = contentEl.createEl("input", {
-      cls: "obsidrop-tagpicker-search",
+      cls: "jotdrop-tagpicker-search",
       attr: { type: "search", placeholder: t("tag_sheet_search") },
     });
     this.inputEl.addEventListener("input", () => {
@@ -48,7 +48,7 @@ export class TagPickerModal extends Modal {
       this.renderList();
     });
 
-    this.listEl = contentEl.createDiv({ cls: "obsidrop-tagpicker-list" });
+    this.listEl = contentEl.createDiv({ cls: "jotdrop-tagpicker-list" });
     this.renderList();
     // Focus the search field so the user can filter immediately.
     setTimeout(() => this.inputEl.focus(), 0);
@@ -66,22 +66,22 @@ export class TagPickerModal extends Modal {
 
     if (filtered.length === 0) {
       this.listEl.createDiv({
-        cls: "obsidrop-tagpicker-empty",
+        cls: "jotdrop-tagpicker-empty",
         text: t("tag_sheet_empty"),
       });
       return;
     }
 
     for (const item of filtered) {
-      const row = this.listEl.createDiv({ cls: "obsidrop-tagpicker-row" });
+      const row = this.listEl.createDiv({ cls: "jotdrop-tagpicker-row" });
       const isSelected = this.selected.has(item.tag);
       if (isSelected) row.addClass("is-selected");
 
-      const check = row.createSpan({ cls: "obsidrop-tagpicker-check" });
+      const check = row.createSpan({ cls: "jotdrop-tagpicker-check" });
       check.setText(isSelected ? "✓" : "");
-      row.createSpan({ cls: "obsidrop-tagpicker-name", text: `#${item.tag}` });
+      row.createSpan({ cls: "jotdrop-tagpicker-name", text: `#${item.tag}` });
       row.createSpan({
-        cls: "obsidrop-tagpicker-count",
+        cls: "jotdrop-tagpicker-count",
         text: String(item.count),
       });
 

@@ -1,5 +1,5 @@
 import { Notice } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { createNoteInFolder } from "./capture";
 import { buildLinkNote, fetchOg } from "./ogfetch";
 import { neutralizeBodyHashtags, updateMeta, ColorName, isColorName } from "./metadata";
@@ -48,11 +48,11 @@ interface ClipBody {
  * settings; rejects everything that is not POST /clip.
  */
 export class ClipServer {
-  private plugin: ObsiDropPlugin;
+  private plugin: JotDropPlugin;
   private server: ServerLike | null = null;
   private boundPort = 0;
 
-  constructor(plugin: ObsiDropPlugin) {
+  constructor(plugin: JotDropPlugin) {
     this.plugin = plugin;
   }
 
@@ -118,7 +118,7 @@ export class ClipServer {
     if (req.method === "GET" && req.url === "/ping") {
       // Health-check for the extension to detect whether the plugin is running.
       res.writeHead(200, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ ok: true, app: "obsidrop" }));
+      res.end(JSON.stringify({ ok: true, app: "jotdrop" }));
       return;
     }
 
@@ -184,7 +184,7 @@ export class ClipServer {
         }
       }
     } catch (e) {
-      console.error("ObsiDrop clip: OG-fetch failed:", e);
+      console.error("JotDrop clip: OG-fetch failed:", e);
     }
 
     const safe = neutralizeBodyHashtags(content);

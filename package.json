@@ -1,5 +1,5 @@
 {
-  "name": "obsidrop",
+  "name": "jotdrop",
   "version": "0.1.0",
   "description": "Google Keep–style quick-capture card grid for Obsidian.",
   "main": "main.js",
@@ -12,12 +12,12 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Diexar-Labs/obsidrop.git"
+    "url": "https://github.com/Diexar-Labs/jotdrop.git"
   },
   "bugs": {
-    "url": "https://github.com/Diexar-Labs/obsidrop/issues"
+    "url": "https://github.com/Diexar-Labs/jotdrop/issues"
   },
-  "homepage": "https://github.com/Diexar-Labs/obsidrop#readme",
+  "homepage": "https://github.com/Diexar-Labs/jotdrop#readme",
   "devDependencies": {
     "@types/node": "^20.11.0",
     "builtin-modules": "^3.3.0",

@@ -1,5 +1,5 @@
 import { App, Modal, Notice, TFile, normalizePath } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { InsertLinkModal } from "./edit";
 import {
   colorLabel,
@@ -13,7 +13,7 @@ import { buildLinkNote, detectAllUrls, fetchOg, OgPreview } from "./ogfetch";
 import { t } from "./i18n";
 
 export class QuickCaptureModal extends Modal {
-  plugin: ObsiDropPlugin;
+  plugin: JotDropPlugin;
   textArea!: HTMLTextAreaElement;
   private chipsEl!: HTMLElement;
   private tagInputEl: HTMLInputElement | null = null;
@@ -29,7 +29,7 @@ export class QuickCaptureModal extends Modal {
     reminder: null,
   };
 
-  constructor(app: App, plugin: ObsiDropPlugin) {
+  constructor(app: App, plugin: JotDropPlugin) {
     super(app);
     this.plugin = plugin;
   }
@@ -37,21 +37,21 @@ export class QuickCaptureModal extends Modal {
   onOpen(): void {
     const { contentEl, titleEl } = this;
     titleEl.setText(t("capture_title"));
-    contentEl.addClass("obsidrop-capture");
+    contentEl.addClass("jotdrop-capture");
 
     this.renderControls(contentEl);
 
     this.textArea = contentEl.createEl("textarea", {
-      cls: "obsidrop-capture-textarea",
+      cls: "jotdrop-capture-textarea",
       attr: { placeholder: t("capture_placeholder") },
     });
     this.textArea.rows = 8;
 
-    const footer = contentEl.createDiv({ cls: "obsidrop-capture-footer" });
-    const hint = footer.createSpan({ cls: "obsidrop-capture-hint" });
+    const footer = contentEl.createDiv({ cls: "jotdrop-capture-footer" });
+    const hint = footer.createSpan({ cls: "jotdrop-capture-hint" });
     hint.setText(t("capture_hint"));
 
-    const buttons = footer.createDiv({ cls: "obsidrop-capture-buttons" });
+    const buttons = footer.createDiv({ cls: "jotdrop-capture-buttons" });
     const cancel = buttons.createEl("button", { text: t("action_cancel") });
     cancel.addEventListener("click", () => this.close());
     const save = buttons.createEl("button", { text: t("action_save"), cls: "mod-cta" });
@@ -68,17 +68,17 @@ export class QuickCaptureModal extends Modal {
   }
 
   private renderControls(parent: HTMLElement): void {
-    let bar = parent.querySelector(".obsidrop-capture-controls") as HTMLElement | null;
-    if (!bar) bar = parent.createDiv({ cls: "obsidrop-capture-controls" });
+    let bar = parent.querySelector(".jotdrop-capture-controls") as HTMLElement | null;
+    if (!bar) bar = parent.createDiv({ cls: "jotdrop-capture-controls" });
     bar.empty();
 
     // Color
-    const colorRow = bar.createDiv({ cls: "obsidrop-edit-colorrow" });
-    colorRow.createSpan({ text: t("label_color"), cls: "obsidrop-edit-label" });
-    const swatches = colorRow.createDiv({ cls: "obsidrop-edit-swatches" });
+    const colorRow = bar.createDiv({ cls: "jotdrop-edit-colorrow" });
+    colorRow.createSpan({ text: t("label_color"), cls: "jotdrop-edit-label" });
+    const swatches = colorRow.createDiv({ cls: "jotdrop-edit-swatches" });
     for (const name of COLOR_NAMES) {
       const sw = swatches.createDiv({
-        cls: `obsidrop-edit-swatch${name === this.state.color ? " is-active" : ""}`,
+        cls: `jotdrop-edit-swatch${name === this.state.color ? " is-active" : ""}`,
         attr: { "aria-label": colorLabel(name), title: colorLabel(name) },
       });
       sw.dataset.color = name;
@@ -89,9 +89,9 @@ export class QuickCaptureModal extends Modal {
     }
 
     // Pin + link
-    const actionRow = bar.createDiv({ cls: "obsidrop-edit-row" });
+    const actionRow = bar.createDiv({ cls: "jotdrop-edit-row" });
     const pinBtn = actionRow.createEl("button", {
-      cls: `obsidrop-edit-pin${this.state.pinned ? " is-active" : ""}`,
+      cls: `jotdrop-edit-pin${this.state.pinned ? " is-active" : ""}`,
       text: this.state.pinned ? t("action_unpin_btn") : t("action_pin_btn"),
     });
     pinBtn.addEventListener("click", () => {
@@ -100,7 +100,7 @@ export class QuickCaptureModal extends Modal {
     });
 
     const linkBtn = actionRow.createEl("button", {
-      cls: "obsidrop-edit-linkbtn",
+      cls: "jotdrop-edit-linkbtn",
       text: t("action_insert_link"),
     });
     linkBtn.addEventListener("click", () => {
@@ -108,16 +108,16 @@ export class QuickCaptureModal extends Modal {
     });
 
     const checkBtn = actionRow.createEl("button", {
-      cls: "obsidrop-edit-linkbtn",
+      cls: "jotdrop-edit-linkbtn",
       text: t("action_checklist"),
     });
     checkBtn.addEventListener("click", () => this.toggleOrInsertChecklist());
 
     // Reminder-input
-    const reminderRow = bar.createDiv({ cls: "obsidrop-edit-row obsidrop-reminder-row" });
-    reminderRow.createSpan({ text: t("label_reminder"), cls: "obsidrop-edit-label" });
+    const reminderRow = bar.createDiv({ cls: "jotdrop-edit-row jotdrop-reminder-row" });
+    reminderRow.createSpan({ text: t("label_reminder"), cls: "jotdrop-edit-label" });
     const reminderInput = reminderRow.createEl("input", {
-      cls: "obsidrop-edit-reminder",
+      cls: "jotdrop-edit-reminder",
       attr: { type: "datetime-local" },
     });
     if (this.state.reminder) reminderInput.value = this.state.reminder;
@@ -125,7 +125,7 @@ export class QuickCaptureModal extends Modal {
       this.state.reminder = reminderInput.value.trim() || null;
     });
     const clearReminder = reminderRow.createEl("button", {
-      cls: "obsidrop-edit-linkbtn",
+      cls: "jotdrop-edit-linkbtn",
       text: t("action_clear_reminder"),
     });
     clearReminder.addEventListener("click", () => {
@@ -135,17 +135,17 @@ export class QuickCaptureModal extends Modal {
 
     // Tags — chips and input share the same flex container so the input always
     // follows directly after the last chip, even when chips wrap to a new line.
-    const tagRow = bar.createDiv({ cls: "obsidrop-edit-tagrow" });
-    tagRow.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
-    this.chipsEl = tagRow.createDiv({ cls: "obsidrop-edit-chips" });
+    const tagRow = bar.createDiv({ cls: "jotdrop-edit-tagrow" });
+    tagRow.createSpan({ text: t("label_tags"), cls: "jotdrop-edit-label" });
+    this.chipsEl = tagRow.createDiv({ cls: "jotdrop-edit-chips" });
     this.tagInputEl = null;
     this.renderChips();
 
     this.tagInputEl = this.chipsEl.createEl("input", {
-      cls: "obsidrop-edit-taginput",
+      cls: "jotdrop-edit-taginput",
       attr: { type: "text", placeholder: t("tag_input_placeholder") },
     });
-    const datalistId = `obsidrop-tagcompletion-capture-${Date.now()}`;
+    const datalistId = `jotdrop-tagcompletion-capture-${Date.now()}`;
     const datalist = tagRow.createEl("datalist", { attr: { id: datalistId } });
     this.tagInputEl.setAttribute("list", datalistId);
     for (const tag of getAllVaultTags(this.app)) {
@@ -178,9 +178,9 @@ export class QuickCaptureModal extends Modal {
     if (!this.chipsEl) return;
     this.chipsEl.empty();
     for (const tag of this.state.tags) {
-      const chip = this.chipsEl.createSpan({ cls: "obsidrop-edit-chip" });
+      const chip = this.chipsEl.createSpan({ cls: "jotdrop-edit-chip" });
       chip.createSpan({ text: `#${tag}` });
-      const x = chip.createSpan({ cls: "obsidrop-edit-chip-x", text: "×" });
+      const x = chip.createSpan({ cls: "jotdrop-edit-chip-x", text: "×" });
       x.addEventListener("click", () => {
         this.state.tags = this.state.tags.filter((t) => t !== tag);
         this.renderChips();
@@ -242,7 +242,7 @@ export class QuickCaptureModal extends Modal {
           content = buildLinkNote(chosenUrl, chosenPreview, content);
         }
       } catch (e) {
-        console.error("ObsiDrop: preview fetch failed:", e);
+        console.error("JotDrop: preview fetch failed:", e);
       } finally {
         notice.hide();
       }

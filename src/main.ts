@@ -1,6 +1,6 @@
 import { Notice, Plugin, TFile, WorkspaceLeaf, normalizePath } from "obsidian";
-import { DEFAULT_SETTINGS, ObsiDropSettings, ObsiDropSettingTab } from "./settings";
-import { ObsiDropView, VIEW_TYPE_OBSIDROP } from "./view";
+import { DEFAULT_SETTINGS, JotDropSettings, JotDropSettingTab } from "./settings";
+import { JotDropView, VIEW_TYPE_JOTDROP } from "./view";
 import { QuickCaptureModal, createNoteInFolder } from "./capture";
 import { PreviewRescue } from "./previewRescue";
 import { ReminderScheduler } from "./reminderScheduler";
@@ -14,8 +14,8 @@ import {
 } from "./metadata";
 import { t } from "./i18n";
 
-export default class ObsiDropPlugin extends Plugin {
-  settings!: ObsiDropSettings;
+export default class JotDropPlugin extends Plugin {
+  settings!: JotDropSettings;
   private refreshTimer: number | null = null;
   // Paths whose next modify-event should be ignored: used during in-place
   // updates (e.g. color change) so the grid does not re-sort due to mtime bump.
@@ -26,14 +26,14 @@ export default class ObsiDropPlugin extends Plugin {
   async onload(): Promise<void> {
     await this.loadSettings();
 
-    this.registerView(VIEW_TYPE_OBSIDROP, (leaf) => new ObsiDropView(leaf, this));
+    this.registerView(VIEW_TYPE_JOTDROP, (leaf) => new JotDropView(leaf, this));
 
-    this.addRibbonIcon("sticky-note", t("open_obsidrop"), () => {
+    this.addRibbonIcon("sticky-note", t("open_jotdrop"), () => {
       this.activateView();
     });
 
     this.addCommand({
-      id: "open-obsidrop",
+      id: "open-jotdrop",
       name: t("cmd_open_view"),
       callback: () => this.activateView(),
     });
@@ -44,7 +44,7 @@ export default class ObsiDropPlugin extends Plugin {
       callback: () => new QuickCaptureModal(this.app, this).open(),
     });
 
-    this.addSettingTab(new ObsiDropSettingTab(this.app, this));
+    this.addSettingTab(new JotDropSettingTab(this.app, this));
 
     this.reminderScheduler = new ReminderScheduler(this);
     this.clipServer = new ClipServer(this);
@@ -78,7 +78,13 @@ export default class ObsiDropPlugin extends Plugin {
 
     // Obsidian-URI fallback for the Chrome extension when the loopback server
     // is off or the plugin was not running at send time. Schema:
-    // obsidian://obsidrop-clip?url=…&title=…&selection=…&tags=…&color=…
+    // obsidian://jotdrop-clip?url=…&title=…&selection=…&tags=…&color=…
+    // Backward-compat: also accept the previous `obsidrop-clip` schema so
+    // installed Chrome extensions from before the rename keep working until
+    // they auto-update.
+    this.registerObsidianProtocolHandler("jotdrop-clip", (params) => {
+      void this.handleClipFromUri(params);
+    });
     this.registerObsidianProtocolHandler("obsidrop-clip", (params) => {
       void this.handleClipFromUri(params);
     });
@@ -124,7 +130,7 @@ export default class ObsiDropPlugin extends Plugin {
   }
 
   /**
-   * Handles an obsidian://obsidrop-clip?…-URI as fallback for when the
+   * Handles an obsidian://jotdrop-clip?…-URI as fallback for when the
    * loopback server was not running at send time. Does OG fetch and creates note.
    */
   private async handleClipFromUri(params: Record<string, string>): Promise<void> {
@@ -149,7 +155,7 @@ export default class ObsiDropPlugin extends Plugin {
         content = `![[${preview.imageBasename}]]\n\n${content}`;
       }
     } catch (e) {
-      console.error("ObsiDrop URI-clip: OG-fetch failed:", e);
+      console.error("JotDrop URI-clip: OG-fetch failed:", e);
     } finally {
       notice.hide();
     }
@@ -173,13 +179,13 @@ export default class ObsiDropPlugin extends Plugin {
 
   async activateView(): Promise<void> {
     const { workspace } = this.app;
-    const existing = workspace.getLeavesOfType(VIEW_TYPE_OBSIDROP);
+    const existing = workspace.getLeavesOfType(VIEW_TYPE_JOTDROP);
     let leaf: WorkspaceLeaf | null;
     if (existing.length > 0) {
       leaf = existing[0];
     } else {
       leaf = workspace.getLeaf("tab");
-      await leaf.setViewState({ type: VIEW_TYPE_OBSIDROP, active: true });
+      await leaf.setViewState({ type: VIEW_TYPE_JOTDROP, active: true });
     }
     workspace.revealLeaf(leaf);
   }
@@ -214,7 +220,7 @@ export default class ObsiDropPlugin extends Plugin {
           changed += 1;
         }
       } catch (err) {
-        console.error("ObsiDrop: neutralize failed for", file.path, err);
+        console.error("JotDrop: neutralize failed for", file.path, err);
       }
     }
     if (changed === 0) {
@@ -231,10 +237,10 @@ export default class ObsiDropPlugin extends Plugin {
     }
     this.refreshTimer = window.setTimeout(() => {
       this.refreshTimer = null;
-      const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_OBSIDROP);
+      const leaves = this.app.workspace.getLeavesOfType(VIEW_TYPE_JOTDROP);
       for (const leaf of leaves) {
         const view = leaf.view;
-        if (view instanceof ObsiDropView) {
+        if (view instanceof JotDropView) {
           void view.render();
         }
       }

@@ -89,7 +89,7 @@ private fun Color.darken(fraction: Float): Color {
 }
 
 @Composable
-fun ObsiDropTheme(
+fun JotDropTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {

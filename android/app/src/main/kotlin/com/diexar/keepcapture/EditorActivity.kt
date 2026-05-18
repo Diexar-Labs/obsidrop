@@ -116,7 +116,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.diexar.keepcapture.ui.ObsiDropTheme
+import com.diexar.keepcapture.ui.JotDropTheme
 import com.diexar.keepcapture.ui.noteCardBrush
 import com.diexar.keepcapture.ui.screenBackgroundBrush
 import kotlinx.coroutines.CoroutineScope
@@ -132,7 +132,7 @@ class EditorActivity : ComponentActivity() {
         val noteUri: Uri? = intent.getStringExtra(EXTRA_NOTE_URI)?.let(Uri::parse)
 
         setContent {
-            ObsiDropTheme {
+            JotDropTheme {
                 EditorScreen(
                     initialUri = noteUri,
                     onClose = { finish() },

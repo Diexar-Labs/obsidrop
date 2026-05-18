@@ -232,7 +232,7 @@ export function neutralizeBodyHashtags(content: string): string {
 /**
  * Very limited HTML render for previews: escapes HTML, renders `[[link]]` and `[[link|alias]]`
  * as styled spans, and converts `[text](url)` plus bare http(s) URLs into clickable
- * `<a class="obsidrop-url">` tags. Clicks are caught by the view via delegation.
+ * `<a class="jotdrop-url">` tags. Clicks are caught by the view via delegation.
  */
 export function renderInlinePreviewHtml(text: string): string {
   // Checklist syntax at the start of a line is replaced by shape glyphs.
@@ -250,7 +250,7 @@ export function renderInlinePreviewHtml(text: string): string {
     (_match, target: string, alias?: string) => {
       const safeTarget = target.trim();
       const display = (alias ?? target).trim();
-      return `<span class="obsidrop-wikilink" data-href="${safeTarget}">${display}</span>`;
+      return `<span class="jotdrop-wikilink" data-href="${safeTarget}">${display}</span>`;
     },
   );
 
@@ -263,7 +263,7 @@ export function renderInlinePreviewHtml(text: string): string {
       // url has already gone through the outer escapeHtml pass; do not escape again,
       // otherwise you get &amp;amp; in href and Telegraaf URLs break with 404.
       placeholders.push(
-        `<a class="obsidrop-url" data-href="${url}" rel="noopener noreferrer">${label}</a>`,
+        `<a class="jotdrop-url" data-href="${url}" rel="noopener noreferrer">${label}</a>`,
       );
       return `L${idx}`;
     },
@@ -277,7 +277,7 @@ export function renderInlinePreviewHtml(text: string): string {
       const trail = tailMatch ? tailMatch[0] : "";
       const clean = trail ? raw.slice(0, raw.length - trail.length) : raw;
       if (!clean) return raw;
-      return `<a class="obsidrop-url" data-href="${clean}" rel="noopener noreferrer">${clean}</a>${trail}`;
+      return `<a class="jotdrop-url" data-href="${clean}" rel="noopener noreferrer">${clean}</a>${trail}`;
     },
   );
 

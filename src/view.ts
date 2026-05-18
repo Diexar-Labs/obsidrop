@@ -1,5 +1,5 @@
 import { ItemView, Menu, Notice, TFile, WorkspaceLeaf, normalizePath, setIcon } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { QuickCaptureModal } from "./capture";
 import { EditNoteModal } from "./edit";
 import { LightboxModal } from "./lightbox";
@@ -22,7 +22,7 @@ import {
 } from "./metadata";
 import { t } from "./i18n";
 
-export const VIEW_TYPE_OBSIDROP = "obsidrop-view";
+export const VIEW_TYPE_JOTDROP = "jotdrop-view";
 
 const TITLE_MAX_WORDS = 10;
 const PREVIEW_MAX_WORDS = 25;
@@ -92,8 +92,8 @@ interface CardData {
   archived: boolean;
 }
 
-export class ObsiDropView extends ItemView {
-  plugin: ObsiDropPlugin;
+export class JotDropView extends ItemView {
+  plugin: JotDropPlugin;
   private gridEl!: HTMLElement;
   private searchEl!: HTMLInputElement;
   private filterBarEl!: HTMLElement;
@@ -109,13 +109,13 @@ export class ObsiDropView extends ItemView {
   private micBtnEl: HTMLButtonElement | null = null;
   private recorder: VoiceMemoRecorder | null = null;
 
-  constructor(leaf: WorkspaceLeaf, plugin: ObsiDropPlugin) {
+  constructor(leaf: WorkspaceLeaf, plugin: JotDropPlugin) {
     super(leaf);
     this.plugin = plugin;
   }
 
   getViewType(): string {
-    return VIEW_TYPE_OBSIDROP;
+    return VIEW_TYPE_JOTDROP;
   }
 
   getDisplayText(): string {
@@ -129,26 +129,26 @@ export class ObsiDropView extends ItemView {
   async onOpen(): Promise<void> {
     const root = this.contentEl;
     root.empty();
-    root.addClass("obsidrop-view");
+    root.addClass("jotdrop-view");
 
-    this.normalToolbarEl = root.createDiv({ cls: "obsidrop-toolbar" });
+    this.normalToolbarEl = root.createDiv({ cls: "jotdrop-toolbar" });
 
-    const newBtn = this.normalToolbarEl.createEl("button", { cls: "obsidrop-new-btn" });
-    setIcon(newBtn.createSpan({ cls: "obsidrop-new-btn-icon" }), "plus");
+    const newBtn = this.normalToolbarEl.createEl("button", { cls: "jotdrop-new-btn" });
+    setIcon(newBtn.createSpan({ cls: "jotdrop-new-btn-icon" }), "plus");
     newBtn.createSpan({ text: t("action_new_note") });
     newBtn.addEventListener("click", () => {
       new QuickCaptureModal(this.app, this.plugin).open();
     });
 
     this.micBtnEl = this.normalToolbarEl.createEl("button", {
-      cls: "obsidrop-mic-btn",
+      cls: "jotdrop-mic-btn",
       attr: { "aria-label": t("action_start_recording") },
     });
     setIcon(this.micBtnEl, "mic");
     this.micBtnEl.addEventListener("click", () => void this.toggleRecord());
 
     this.searchEl = this.normalToolbarEl.createEl("input", {
-      cls: "obsidrop-search",
+      cls: "jotdrop-search",
       attr: { type: "search", placeholder: t("search_placeholder") },
     });
     this.searchEl.addEventListener("input", () => {
@@ -157,12 +157,12 @@ export class ObsiDropView extends ItemView {
     });
 
     this.selectionToolbarEl = root.createDiv({
-      cls: "obsidrop-toolbar obsidrop-selection-toolbar is-hidden",
+      cls: "jotdrop-toolbar jotdrop-selection-toolbar is-hidden",
     });
     this.buildSelectionToolbar();
 
-    this.filterBarEl = root.createDiv({ cls: "obsidrop-filter-bar" });
-    this.gridEl = root.createDiv({ cls: "obsidrop-grid" });
+    this.filterBarEl = root.createDiv({ cls: "jotdrop-filter-bar" });
+    this.gridEl = root.createDiv({ cls: "jotdrop-grid" });
     this.applyCardWidth();
 
     // Escape exits selection mode (counterpart of Android's BackHandler).
@@ -181,33 +181,33 @@ export class ObsiDropView extends ItemView {
     bar.empty();
 
     const exitBtn = bar.createEl("button", {
-      cls: "obsidrop-selection-exit",
+      cls: "jotdrop-selection-exit",
       attr: { "aria-label": t("action_exit_selection") },
     });
     setIcon(exitBtn, "x");
     exitBtn.addEventListener("click", () => this.exitSelection());
 
-    this.selectionCountEl = bar.createDiv({ cls: "obsidrop-selection-count" });
+    this.selectionCountEl = bar.createDiv({ cls: "jotdrop-selection-count" });
 
-    const spacer = bar.createDiv({ cls: "obsidrop-selection-spacer" });
+    const spacer = bar.createDiv({ cls: "jotdrop-selection-spacer" });
     void spacer;
 
     this.selectAllBtn = bar.createEl("button", {
-      cls: "obsidrop-selection-action",
+      cls: "jotdrop-selection-action",
       attr: { "aria-label": t("action_select_all") },
     });
     setIcon(this.selectAllBtn, "check-check");
     this.selectAllBtn.addEventListener("click", () => this.selectAllFiltered());
 
     const archiveBtn = bar.createEl("button", {
-      cls: "obsidrop-selection-action",
+      cls: "jotdrop-selection-action",
       attr: { "aria-label": t("action_archive") },
     });
     setIcon(archiveBtn, "archive");
     archiveBtn.addEventListener("click", () => this.confirmBulkArchive());
 
     const deleteBtn = bar.createEl("button", {
-      cls: "obsidrop-selection-action is-destructive",
+      cls: "jotdrop-selection-action is-destructive",
       attr: { "aria-label": t("action_delete") },
     });
     setIcon(deleteBtn, "trash-2");
@@ -258,7 +258,7 @@ export class ObsiDropView extends ItemView {
     // otherwise the user loses scroll position on every toggle. Looping
     // is more robust than an attribute selector on file paths (which contain
     // slashes, dots and possibly quotes that are awkward to CSS-escape).
-    const cards = this.gridEl.querySelectorAll<HTMLElement>(".obsidrop-card");
+    const cards = this.gridEl.querySelectorAll<HTMLElement>(".jotdrop-card");
     for (const c of Array.from(cards)) {
       if (c.dataset.path === path) {
         this.applyCardSelectionVisual(c, this.selectedPaths.has(path));
@@ -286,7 +286,7 @@ export class ObsiDropView extends ItemView {
 
   private applyCardSelectionVisual(cardEl: HTMLElement, selected: boolean): void {
     cardEl.toggleClass("is-selected", selected);
-    const marker = cardEl.querySelector(".obsidrop-card-select-marker");
+    const marker = cardEl.querySelector(".jotdrop-card-select-marker");
     if (marker instanceof HTMLElement) {
       marker.empty();
       setIcon(marker, selected ? "check-circle-2" : "circle");
@@ -632,7 +632,7 @@ export class ObsiDropView extends ItemView {
 
   applyCardWidth(): void {
     if (this.gridEl) {
-      this.gridEl.style.setProperty("--obsidrop-card-width", `${this.plugin.settings.cardWidth}px`);
+      this.gridEl.style.setProperty("--jotdrop-card-width", `${this.plugin.settings.cardWidth}px`);
     }
   }
 
@@ -665,14 +665,14 @@ export class ObsiDropView extends ItemView {
     if (this.selectionMode) this.updateSelectionToolbar();
 
     if (filtered.length === 0) {
-      const empty = this.gridEl.createDiv({ cls: "obsidrop-empty" });
+      const empty = this.gridEl.createDiv({ cls: "jotdrop-empty" });
       if (cards.length === 0) {
         empty.createEl("h3", { text: t("empty_no_notes_title") });
         empty.createEl("p", { text: t("empty_no_notes_desc") });
       } else {
         empty.createEl("h3", { text: t("empty_no_results") });
         const clearBtn = empty.createEl("button", {
-          cls: "obsidrop-empty-clear",
+          cls: "jotdrop-empty-clear",
           text: t("empty_no_results_clear"),
         });
         clearBtn.addEventListener("click", () => this.clearAllFilters());
@@ -684,17 +684,17 @@ export class ObsiDropView extends ItemView {
     const rest = filtered.filter((c) => !c.meta.pinned);
 
     if (pinned.length > 0) {
-      const pinnedSection = this.gridEl.createDiv({ cls: "obsidrop-section" });
-      pinnedSection.createDiv({ cls: "obsidrop-section-label", text: t("section_pinned") });
-      const pinnedGrid = pinnedSection.createDiv({ cls: "obsidrop-grid-inner" });
+      const pinnedSection = this.gridEl.createDiv({ cls: "jotdrop-section" });
+      pinnedSection.createDiv({ cls: "jotdrop-section-label", text: t("section_pinned") });
+      const pinnedGrid = pinnedSection.createDiv({ cls: "jotdrop-grid-inner" });
       for (const c of pinned) this.renderCard(pinnedGrid, c);
 
-      const restSection = this.gridEl.createDiv({ cls: "obsidrop-section" });
-      restSection.createDiv({ cls: "obsidrop-section-label", text: t("section_other") });
-      const restGrid = restSection.createDiv({ cls: "obsidrop-grid-inner" });
+      const restSection = this.gridEl.createDiv({ cls: "jotdrop-section" });
+      restSection.createDiv({ cls: "jotdrop-section-label", text: t("section_other") });
+      const restGrid = restSection.createDiv({ cls: "jotdrop-grid-inner" });
       for (const c of rest) this.renderCard(restGrid, c);
     } else {
-      const inner = this.gridEl.createDiv({ cls: "obsidrop-grid-inner" });
+      const inner = this.gridEl.createDiv({ cls: "jotdrop-grid-inner" });
       for (const c of rest) this.renderCard(inner, c);
     }
   }
@@ -732,7 +732,7 @@ export class ObsiDropView extends ItemView {
 
     if (overflowCount > 0) {
       const more = this.filterBarEl.createEl("button", {
-        cls: "obsidrop-filter-chip is-overflow",
+        cls: "jotdrop-filter-chip is-overflow",
         text: t("tag_overflow_more", String(overflowCount)),
       });
       more.addEventListener("click", () => {
@@ -752,7 +752,7 @@ export class ObsiDropView extends ItemView {
 
     if (this.selectedTags.size > 0) {
       const clear = this.filterBarEl.createEl("button", {
-        cls: "obsidrop-filter-clear",
+        cls: "jotdrop-filter-clear",
         text: t("tag_filter_clear"),
       });
       clear.addEventListener("click", () => {
@@ -764,13 +764,13 @@ export class ObsiDropView extends ItemView {
 
   private renderTagChip(tag: string, isSelected: boolean): void {
     const chip = this.filterBarEl.createEl("button", {
-      cls: `obsidrop-filter-chip${isSelected ? " is-selected" : ""}`,
+      cls: `jotdrop-filter-chip${isSelected ? " is-selected" : ""}`,
     });
     // Explicit ✓ symbol — color alone is insufficient (color-blind parity
     // with the Android FilterChip that also shows a Done icon).
-    const check = chip.createSpan({ cls: "obsidrop-filter-chip-check" });
+    const check = chip.createSpan({ cls: "jotdrop-filter-chip-check" });
     check.setText(isSelected ? "✓" : "");
-    chip.createSpan({ cls: "obsidrop-filter-chip-label", text: `#${tag}` });
+    chip.createSpan({ cls: "jotdrop-filter-chip-label", text: `#${tag}` });
     chip.addEventListener("click", () => this.toggleTagFilter(tag));
   }
 
@@ -838,7 +838,7 @@ export class ObsiDropView extends ItemView {
     const isSelected = this.selectedPaths.has(file.path);
     const cardEl = parent.createDiv({
       cls: [
-        "obsidrop-card",
+        "jotdrop-card",
         archived ? "is-archived" : "",
         meta.pinned ? "is-pinned" : "",
         isSelected ? "is-selected" : "",
@@ -854,14 +854,14 @@ export class ObsiDropView extends ItemView {
     // Selection-marker overlay (top-right). Shape-based (filled vs empty
     // circle icon) so selected state is visible without color perception.
     // Shown only in selection mode via CSS.
-    const marker = cardEl.createSpan({ cls: "obsidrop-card-select-marker" });
+    const marker = cardEl.createSpan({ cls: "jotdrop-card-select-marker" });
     setIcon(marker, isSelected ? "check-circle-2" : "circle");
 
     const titleText = extractTitle(content, file.basename);
     const previewText = extractPreview(content);
     const urls = extractUrls(content);
 
-    const body = cardEl.createDiv({ cls: "obsidrop-card-body" });
+    const body = cardEl.createDiv({ cls: "jotdrop-card-body" });
 
     const thumbnailBasename = extractFirstEmbeddedImage(content);
     const attachment = thumbnailBasename
@@ -880,7 +880,7 @@ export class ObsiDropView extends ItemView {
     });
 
     if (attachment) {
-      const thumbWrap = body.createDiv({ cls: "obsidrop-card-thumbnail" });
+      const thumbWrap = body.createDiv({ cls: "jotdrop-card-thumbnail" });
       const img = thumbWrap.createEl("img");
       img.src = attachment.resourcePath;
       img.alt = "";
@@ -900,34 +900,34 @@ export class ObsiDropView extends ItemView {
         ).open();
       });
     } else if (audioBasename) {
-      const banner = body.createDiv({ cls: "obsidrop-card-voice-banner" });
+      const banner = body.createDiv({ cls: "jotdrop-card-voice-banner" });
       banner.setAttribute("aria-label", t("voice_memo_card_label"));
-      const iconEl = banner.createSpan({ cls: "obsidrop-card-voice-icon" });
+      const iconEl = banner.createSpan({ cls: "jotdrop-card-voice-icon" });
       setIcon(iconEl, "audio-lines");
     }
 
-    body.createEl("h3", { cls: "obsidrop-card-title", text: titleText });
+    body.createEl("h3", { cls: "jotdrop-card-title", text: titleText });
 
     if (meta.reminder) {
       const ms = parseReminderMs(meta.reminder);
       if (Number.isFinite(ms)) {
         const overdue = ms < Date.now();
         const badge = body.createDiv({
-          cls: `obsidrop-card-reminder${overdue ? " is-overdue" : ""}`,
+          cls: `jotdrop-card-reminder${overdue ? " is-overdue" : ""}`,
         });
         badge.createSpan({
-          cls: "obsidrop-card-reminder-label",
+          cls: "jotdrop-card-reminder-label",
           text: overdue ? t("reminder_badge_overdue") : t("reminder_badge_due"),
         });
         badge.createSpan({
-          cls: "obsidrop-card-reminder-rel",
+          cls: "jotdrop-card-reminder-rel",
           text: formatReminderShort(meta.reminder),
         });
       }
     }
 
     if (previewText) {
-      const preview = body.createDiv({ cls: "obsidrop-card-preview" });
+      const preview = body.createDiv({ cls: "jotdrop-card-preview" });
       preview.innerHTML = renderInlinePreviewHtml(previewText);
       preview.addEventListener("click", (e) => {
         if (this.selectionMode) {
@@ -940,10 +940,10 @@ export class ObsiDropView extends ItemView {
     }
 
     if (urls.length > 0) {
-      const linkWrap = body.createDiv({ cls: "obsidrop-card-links" });
+      const linkWrap = body.createDiv({ cls: "jotdrop-card-links" });
       for (const url of urls.slice(0, LINK_CHIPS_VISIBLE)) {
         const chip = linkWrap.createEl("a", {
-          cls: "obsidrop-card-link",
+          cls: "jotdrop-card-link",
           text: hostnameOf(url),
           attr: { href: url, rel: "noopener noreferrer", title: url },
         });
@@ -958,7 +958,7 @@ export class ObsiDropView extends ItemView {
       }
       if (urls.length > LINK_CHIPS_VISIBLE) {
         const more = linkWrap.createSpan({
-          cls: "obsidrop-card-link-more",
+          cls: "jotdrop-card-link-more",
           text: `+${urls.length - LINK_CHIPS_VISIBLE}`,
           attr: { title: t("link_chip_more_tooltip") },
         });
@@ -971,16 +971,16 @@ export class ObsiDropView extends ItemView {
     }
 
     if (meta.tags.length > 0) {
-      const tagWrap = body.createDiv({ cls: "obsidrop-card-tags" });
+      const tagWrap = body.createDiv({ cls: "jotdrop-card-tags" });
       for (const tag of meta.tags) {
-        tagWrap.createSpan({ cls: "obsidrop-card-tag", text: `#${tag}` });
+        tagWrap.createSpan({ cls: "jotdrop-card-tag", text: `#${tag}` });
       }
     }
 
-    const actions = cardEl.createDiv({ cls: "obsidrop-card-actions" });
+    const actions = cardEl.createDiv({ cls: "jotdrop-card-actions" });
 
     const pinBtn = actions.createEl("button", {
-      cls: `obsidrop-card-action${meta.pinned ? " is-active" : ""}`,
+      cls: `jotdrop-card-action${meta.pinned ? " is-active" : ""}`,
       attr: { "aria-label": meta.pinned ? t("action_unpin") : t("action_pin") },
     });
     setIcon(pinBtn, meta.pinned ? "pin-off" : "pin");
@@ -991,7 +991,7 @@ export class ObsiDropView extends ItemView {
     });
 
     const colorBtn = actions.createEl("button", {
-      cls: "obsidrop-card-action",
+      cls: "jotdrop-card-action",
       attr: { "aria-label": t("action_color") },
     });
     setIcon(colorBtn, "palette");
@@ -1001,7 +1001,7 @@ export class ObsiDropView extends ItemView {
     });
 
     const editBtn = actions.createEl("button", {
-      cls: "obsidrop-card-action",
+      cls: "jotdrop-card-action",
       attr: { "aria-label": t("action_edit") },
     });
     setIcon(editBtn, "pencil");
@@ -1011,7 +1011,7 @@ export class ObsiDropView extends ItemView {
     });
 
     const archiveBtn = actions.createEl("button", {
-      cls: "obsidrop-card-action",
+      cls: "jotdrop-card-action",
       attr: { "aria-label": archived ? t("action_unarchive") : t("action_archive") },
     });
     setIcon(archiveBtn, archived ? "archive-restore" : "archive");
@@ -1021,7 +1021,7 @@ export class ObsiDropView extends ItemView {
     });
 
     const moreBtn = actions.createEl("button", {
-      cls: "obsidrop-card-action",
+      cls: "jotdrop-card-action",
       attr: { "aria-label": t("action_more") },
     });
     setIcon(moreBtn, "more-vertical");
@@ -1079,7 +1079,7 @@ export class ObsiDropView extends ItemView {
 
   private handlePreviewClick(e: MouseEvent): void {
     const target = e.target as HTMLElement;
-    const wiki = target.closest(".obsidrop-wikilink") as HTMLElement | null;
+    const wiki = target.closest(".jotdrop-wikilink") as HTMLElement | null;
     if (wiki) {
       e.preventDefault();
       e.stopPropagation();
@@ -1093,7 +1093,7 @@ export class ObsiDropView extends ItemView {
       }
       return;
     }
-    const url = target.closest(".obsidrop-url") as HTMLElement | null;
+    const url = target.closest(".jotdrop-url") as HTMLElement | null;
     if (url) {
       e.preventDefault();
       e.stopPropagation();
@@ -1103,17 +1103,17 @@ export class ObsiDropView extends ItemView {
   }
 
   private showLinkBar(anchor: HTMLElement, href: string): void {
-    document.body.querySelectorAll(".obsidrop-link-bar").forEach((el) => el.remove());
+    document.body.querySelectorAll(".jotdrop-link-bar").forEach((el) => el.remove());
 
-    const bar = document.body.createDiv({ cls: "obsidrop-link-bar" });
-    const urlSpan = bar.createSpan({ cls: "obsidrop-link-bar-url" });
+    const bar = document.body.createDiv({ cls: "jotdrop-link-bar" });
+    const urlSpan = bar.createSpan({ cls: "jotdrop-link-bar-url" });
     urlSpan.setText(href.length > 60 ? `${href.slice(0, 57)}…` : href);
     const openBtn = bar.createEl("button", {
-      cls: "obsidrop-link-bar-open",
+      cls: "jotdrop-link-bar-open",
       text: t("action_open_link"),
     });
     const closeBtn = bar.createEl("button", {
-      cls: "obsidrop-link-bar-close",
+      cls: "jotdrop-link-bar-close",
       attr: { "aria-label": t("action_close") },
       text: "×",
     });
@@ -1358,7 +1358,7 @@ function extractPreview(content: string): string {
   const stripped = body
     .replace(/!\[\[[^\]]+\]\]/g, "")
     .replace(/!\[[^\]]*\]\([^)]+\)/g, "")
-    .replace(/<!--\s*(?:obsidrop|diexar)-preview:.*?-->/g, "")
+    .replace(/<!--\s*(?:jotdrop|diexar)-preview:.*?-->/g, "")
     .replace(/^\s{0,3}#+\s+.*$/gm, "")
     .replace(/\[([^\]\n]+)\]\((https?:\/\/[^)\s]+)\)/g, "$1")
     .replace(/https?:\/\/\S+/g, "");

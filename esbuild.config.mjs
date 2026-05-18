@@ -6,13 +6,13 @@ import builtins from "builtin-modules";
 
 const prod = process.argv[2] === "production";
 
-// Plugin install location in the vault. Override via OBSIDROP_VAULT_PLUGIN_DIR env var
+// Plugin install location in the vault. Override via JOTDROP_VAULT_PLUGIN_DIR env var
 // if you use a different vault. Silently skips if the path doesn't exist, preventing
 // build failures on CI or fresh clones without a local vault.
 const VAULT_PLUGIN_DIR =
-  process.env.OBSIDROP_VAULT_PLUGIN_DIR ||
+  process.env.JOTDROP_VAULT_PLUGIN_DIR ||
   process.env.DIEXAR_VAULT_PLUGIN_DIR ||
-  "F:/New Dee/My Notes/Vault_1/.obsidian/plugins/obsidrop";
+  "F:/New Dee/My Notes/Vault_1/.obsidian/plugins/jotdrop";
 
 function copyToVault() {
   if (!fs.existsSync(VAULT_PLUGIN_DIR)) {
@@ -35,7 +35,7 @@ function copyToVault() {
 // production and watch mode. Reload Obsidian (Ctrl+R) or toggle the plugin
 // to pick up the new bundle.
 const deployPlugin = {
-  name: "obsidrop-deploy",
+  name: "jotdrop-deploy",
   setup(build) {
     build.onEnd((result) => {
       if (result.errors.length === 0) copyToVault();

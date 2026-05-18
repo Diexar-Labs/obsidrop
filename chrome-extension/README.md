@@ -1,6 +1,6 @@
-# ObsiDrop Web Clipper (Chrome extension)
+# JotDrop Web Clipper (Chrome extension)
 
-Save the current browser page as a card in your ObsiDrop vault.
+Save the current browser page as a card in your JotDrop vault.
 
 ## Install (developer mode, until published)
 
@@ -11,7 +11,7 @@ Save the current browser page as a card in your ObsiDrop vault.
 
 ## Pair with the plugin
 
-1. In Obsidian, open **Settings → ObsiDrop → Web clipper**.
+1. In Obsidian, open **Settings → JotDrop → Web clipper**.
 2. Toggle **Enable clip server** on. A token is generated.
 3. Click **Copy** next to the token.
 4. In the extension: right-click the icon → **Options**, paste the token, click **Save**.
@@ -20,11 +20,11 @@ Save the current browser page as a card in your ObsiDrop vault.
 ## Use
 
 Click the extension icon on any page. The popup shows the page title and lets
-you add tags / pick a color before saving. **Save to ObsiDrop** writes a card
+you add tags / pick a color before saving. **Save to JotDrop** writes a card
 into your vault's notes folder with an OG-image preview.
 
 If Obsidian is closed or the plugin is disabled, the popup falls back to
-opening an `obsidian://obsidrop-clip?...` URI — Obsidian launches and the
+opening an `obsidian://jotdrop-clip?...` URI — Obsidian launches and the
 plugin handles the clip on load.
 
 ## Privacy & security

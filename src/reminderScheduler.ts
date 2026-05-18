@@ -1,5 +1,5 @@
 import { Notice, TFile, normalizePath } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { LightboxModal } from "./lightbox";
 import { EditNoteModal } from "./edit";
 import { parseReminderMs, readMeta } from "./metadata";
@@ -12,11 +12,11 @@ import { t } from "./i18n";
  * we reschedule every day instead of one giant timeout.
  */
 export class ReminderScheduler {
-  private plugin: ObsiDropPlugin;
+  private plugin: JotDropPlugin;
   private timers: Map<string, number> = new Map();
   private static readonly MAX_DELAY_MS = 24 * 60 * 60 * 1000; // 24 h, ruim onder browser-limiet
 
-  constructor(plugin: ObsiDropPlugin) {
+  constructor(plugin: JotDropPlugin) {
     this.plugin = plugin;
   }
 
@@ -73,7 +73,7 @@ export class ReminderScheduler {
     // Notice with click handler → opens lightbox if there is an attachment,
     // otherwise the edit modal.
     const notice = new Notice(t("notice_reminder_fired", file.basename), 30_000);
-    notice.noticeEl.addClass("obsidrop-reminder-notice");
+    notice.noticeEl.addClass("jotdrop-reminder-notice");
     notice.noticeEl.addEventListener("click", () => {
       notice.hide();
       this.openCard(file);

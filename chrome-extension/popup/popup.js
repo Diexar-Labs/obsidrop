@@ -1,11 +1,11 @@
-// ObsiDrop Web Clipper — popup logic
+// JotDrop Web Clipper — popup logic
 //
 // Steps:
 // 1. Read the active tab; retrieve title/url + selected text from the page DOM via
 //    chrome.scripting.executeScript (one-time injection, no permanent content-script).
 // 2. Populate the preview block and the selection field.
 // 3. On Save → POST to 127.0.0.1:<port>/clip with Bearer token from storage.
-//    On network error or 401: fall back to obsidian://obsidrop-clip?…
+//    On network error or 401: fall back to obsidian://jotdrop-clip?…
 
 const $ = (id) => document.getElementById(id);
 const els = {
@@ -142,7 +142,7 @@ function buildObsidianUri(payload) {
   if (payload.selection) qs.set("selection", payload.selection);
   if (payload.tags && payload.tags.length) qs.set("tags", payload.tags.join(","));
   if (payload.color && payload.color !== "default") qs.set("color", payload.color);
-  return `obsidian://obsidrop-clip?${qs.toString()}`;
+  return `obsidian://jotdrop-clip?${qs.toString()}`;
 }
 
 async function save() {
@@ -180,7 +180,7 @@ async function save() {
     setStatus("Saved ✓", "ok");
     setTimeout(() => window.close(), 600);
   } catch (e) {
-    console.warn("ObsiDrop: clip-server unreachable, falling back to obsidian:// URI", e);
+    console.warn("JotDrop: clip-server unreachable, falling back to obsidian:// URI", e);
     // Fallback opens Obsidian via the protocol handler. We cannot be certain the
     // plugin is active — the user will see the note in their vault once Obsidian
     // is open and the plugin is loaded.

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources xmlns:tools="http://schemas.android.com/tools">
 
-    <style name="Theme.ObsiDrop" parent="Theme.Material3.DayNight">
+    <style name="Theme.JotDrop" parent="Theme.Material3.DayNight">
         <item name="colorPrimary">@color/diexar_primary</item>
         <item name="colorOnPrimary">@android:color/white</item>
         <!-- Transparante systeembalken zodat de Compose-gradient erdoorheen doorloopt;
@@ -13,19 +13,19 @@
     <!-- Splash theme: deep aubergine background that matches the brand banner.
          An animated spinner replaces the launcher-icon flash — een draaiend
          rondje communiceert "laden" duidelijker dan een flits van het app-icoon.
-         postSplashScreenTheme hands off to Theme.ObsiDrop zodra MainActivity
+         postSplashScreenTheme hands off to Theme.JotDrop zodra MainActivity
          klaar is met cold-start. -->
-    <style name="Theme.ObsiDrop.Splash" parent="Theme.SplashScreen">
+    <style name="Theme.JotDrop.Splash" parent="Theme.SplashScreen">
         <item name="windowSplashScreenBackground">@color/splash_background</item>
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_spinner</item>
         <item name="windowSplashScreenAnimationDuration">1000</item>
-        <item name="postSplashScreenTheme">@style/Theme.ObsiDrop</item>
+        <item name="postSplashScreenTheme">@style/Theme.JotDrop</item>
         <!-- Fallback for API < 31 where the native splash isn't honored: the compat
              library shows windowBackground until installSplashScreen() runs. -->
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
 
-    <style name="Theme.ObsiDrop.Transparent" parent="Theme.ObsiDrop">
+    <style name="Theme.JotDrop.Transparent" parent="Theme.JotDrop">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
         <item name="android:windowNoTitle">true</item>

@@ -1,11 +1,11 @@
 import { Notice, TAbstractFile, TFile } from "obsidian";
 import { fetchOg, buildLinkNote, detectUrl } from "./ogfetch";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { t } from "./i18n";
 
 /**
  * Picks up placeholder notes sent by Android v0.6.0+ via Syncthing
- * (identified by `<!-- obsidrop-preview: pending -->` or the older
+ * (identified by `<!-- jotdrop-preview: pending -->` or the older
  * `diexar-preview` format) that the Android-side `PreviewWorker` could not
  * finish for whatever reason — e.g. the phone was offline, battery died,
  * or WorkManager retries were exhausted.
@@ -17,9 +17,9 @@ import { t } from "./i18n";
  * conflicts with slow OG endpoints (TikTok oEmbed sometimes runs 30s+).
  */
 
-// Accept both markers — `diexar-preview` is kept for placeholders that arrived
-// from an older Android build (before the rename).
-const PENDING_MARKER_REGEX = /<!--\s*(?:obsidrop|diexar)-preview:\s*pending\s*-->/;
+// Accept all three markers — `obsidrop-preview` and `diexar-preview` are kept
+// for placeholders that arrived from older Android builds (before each rename).
+const PENDING_MARKER_REGEX = /<!--\s*(?:jotdrop|obsidrop|diexar)-preview:\s*pending\s*-->/;
 function hasPendingMarker(content: string): boolean {
   return PENDING_MARKER_REGEX.test(content);
 }
@@ -32,7 +32,7 @@ const MIN_RESCUE_AGE_MS = 5 * 60 * 1000;
 export class PreviewRescue {
   private pending = new Map<string, number>();
 
-  constructor(private plugin: ObsiDropPlugin) {}
+  constructor(private plugin: JotDropPlugin) {}
 
   start(): void {
     const { vault } = this.plugin.app;
@@ -166,7 +166,7 @@ export class PreviewRescue {
     try {
       await this.plugin.app.vault.modify(file, newContent);
     } catch (e) {
-      console.error("ObsiDrop preview-rescue: write failed for", file.path, e);
+      console.error("JotDrop preview-rescue: write failed for", file.path, e);
     }
   }
 }

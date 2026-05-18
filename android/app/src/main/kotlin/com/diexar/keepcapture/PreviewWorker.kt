@@ -64,7 +64,7 @@ class PreviewWorker(
         const val KEY_NOTE_URI = "note_uri"
         const val KEY_URL = "url"
         const val KEY_FALLBACK_SUBJECT = "subject"
-        const val PENDING_MARKER = "<!-- obsidrop-preview: pending -->"
+        const val PENDING_MARKER = "<!-- jotdrop-preview: pending -->"
 
         fun enqueue(context: Context, noteUri: Uri, url: String, subject: String?) {
             val data = workDataOf(
@@ -126,7 +126,7 @@ class PreviewWorker(
                     append(description)
                 }
                 if (diagnostic != null) {
-                    append("\n\n<!-- obsidrop-preview: ")
+                    append("\n\n<!-- jotdrop-preview: ")
                     append(diagnostic)
                     append(" -->")
                 }

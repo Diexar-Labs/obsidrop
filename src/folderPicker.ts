@@ -27,7 +27,7 @@ export class FolderPickerModal extends SuggestModal<TFolder> {
   renderSuggestion(value: TFolder, el: HTMLElement): void {
     el.createDiv({ text: value.path || "/" });
     el.createDiv({
-      cls: "obsidrop-suggest-path",
+      cls: "jotdrop-suggest-path",
       text: value.parent ? value.parent.path || "/" : t("folder_root_label"),
     });
   }

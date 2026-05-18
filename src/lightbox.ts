@@ -1,5 +1,5 @@
 import { App, FileSystemAdapter, Modal, Notice, TFile } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { EditNoteModal } from "./edit";
 import { t } from "./i18n";
 
@@ -9,7 +9,7 @@ import { t } from "./i18n";
  * open the image in an Obsidian tab.
  */
 export class LightboxModal extends Modal {
-  private plugin: ObsiDropPlugin;
+  private plugin: JotDropPlugin;
   private noteFile: TFile;
   private imageResourcePath: string;
   private attachmentFile: TFile | null;
@@ -17,7 +17,7 @@ export class LightboxModal extends Modal {
 
   constructor(
     app: App,
-    plugin: ObsiDropPlugin,
+    plugin: JotDropPlugin,
     noteFile: TFile,
     imageResourcePath: string,
     attachmentFile: TFile | null,
@@ -34,21 +34,21 @@ export class LightboxModal extends Modal {
   onOpen(): void {
     this.titleEl.setText(this.noteFile.basename);
     const root = this.contentEl;
-    root.addClass("obsidrop-lightbox");
+    root.addClass("jotdrop-lightbox");
 
-    const figure = root.createDiv({ cls: "obsidrop-lightbox-figure" });
-    const img = figure.createEl("img", { cls: "obsidrop-lightbox-img" });
+    const figure = root.createDiv({ cls: "jotdrop-lightbox-figure" });
+    const img = figure.createEl("img", { cls: "jotdrop-lightbox-img" });
     img.src = this.imageResourcePath;
     img.alt = this.noteFile.basename;
     img.addEventListener("error", () => {
       figure.empty();
       figure.createEl("p", {
-        cls: "obsidrop-lightbox-error",
+        cls: "jotdrop-lightbox-error",
         text: t("lightbox_load_failed"),
       });
     });
 
-    const actions = root.createDiv({ cls: "obsidrop-lightbox-actions" });
+    const actions = root.createDiv({ cls: "jotdrop-lightbox-actions" });
 
     const editBtn = actions.createEl("button", {
       text: t("action_edit_note"),
@@ -75,7 +75,7 @@ export class LightboxModal extends Modal {
     const adapter = this.app.vault.adapter;
     if (this.vaultPath && adapter instanceof FileSystemAdapter) {
       const externalBtn = actions.createEl("button", {
-        cls: "obsidrop-lightbox-external",
+        cls: "jotdrop-lightbox-external",
         text: t("lightbox_open_external"),
       });
       externalBtn.addEventListener("click", async () => {

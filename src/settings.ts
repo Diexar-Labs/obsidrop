@@ -1,5 +1,5 @@
 import { App, Notice, PluginSettingTab, Setting } from "obsidian";
-import type ObsiDropPlugin from "./main";
+import type JotDropPlugin from "./main";
 import { t } from "./i18n";
 
 function generateToken(): string {
@@ -10,7 +10,7 @@ function generateToken(): string {
 
 export type SortMode = "modified-desc" | "modified-asc" | "created-desc" | "created-asc" | "title-asc";
 
-export interface ObsiDropSettings {
+export interface JotDropSettings {
   notesFolder: string;
   archiveFolder: string;
   sortMode: SortMode;
@@ -26,7 +26,7 @@ export interface ObsiDropSettings {
   clipServerToken: string;
 }
 
-export const DEFAULT_SETTINGS: ObsiDropSettings = {
+export const DEFAULT_SETTINGS: JotDropSettings = {
   notesFolder: "Mini Notes",
   archiveFolder: "Mini Notes/Archive",
   sortMode: "modified-desc",
@@ -38,10 +38,10 @@ export const DEFAULT_SETTINGS: ObsiDropSettings = {
   clipServerToken: "",
 };
 
-export class ObsiDropSettingTab extends PluginSettingTab {
-  plugin: ObsiDropPlugin;
+export class JotDropSettingTab extends PluginSettingTab {
+  plugin: JotDropPlugin;
 
-  constructor(app: App, plugin: ObsiDropPlugin) {
+  constructor(app: App, plugin: JotDropPlugin) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -138,7 +138,7 @@ export class ObsiDropSettingTab extends PluginSettingTab {
     // uses it and it does not need to shout for attention at the top.
     containerEl.createEl("h3", { text: t("settings_clip_server_section") });
     const clipDesc = containerEl.createEl("p", {
-      cls: "obsidrop-clip-desc",
+      cls: "jotdrop-clip-desc",
       text: t("settings_clip_server_desc"),
     });
     void clipDesc;
@@ -206,15 +206,15 @@ export class ObsiDropSettingTab extends PluginSettingTab {
         }),
     );
 
-    // "About ObsiDrop" — unobtrusive, dismisses itself if the user has no
+    // "About JotDrop" — unobtrusive, dismisses itself if the user has no
     // interest. No popups, no "premium" features. Open source +
     // optional thank-you button.
-    const support = containerEl.createDiv({ cls: "obsidrop-support" });
+    const support = containerEl.createDiv({ cls: "jotdrop-support" });
     support.createEl("h3", { text: t("section_support") });
     support.createEl("p", { text: t("support_blurb") });
-    const buttonRow = support.createDiv({ cls: "obsidrop-support-buttons" });
+    const buttonRow = support.createDiv({ cls: "jotdrop-support-buttons" });
     const kofiLink = buttonRow.createEl("a", {
-      cls: "obsidrop-support-button",
+      cls: "jotdrop-support-button",
       attr: { href: "https://ko-fi.com/L3L11ZETB9", target: "_blank", rel: "noopener noreferrer" },
     });
     kofiLink.setText(t("support_kofi"));

@@ -46,10 +46,10 @@ async function test() {
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = await res.json();
-    if (json && json.app === "obsidrop") {
-      setStatus("Connection OK — ObsiDrop is running.", true);
+    if (json && json.app === "jotdrop") {
+      setStatus("Connection OK — JotDrop is running.", true);
     } else {
-      setStatus("Reached server, but it's not ObsiDrop.", false);
+      setStatus("Reached server, but it's not JotDrop.", false);
     }
   } catch (e) {
     setStatus(`Cannot reach plugin: ${e.message || e}`, false);
