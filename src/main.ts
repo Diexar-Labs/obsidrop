@@ -144,7 +144,7 @@ export default class ObsiDropPlugin extends Plugin {
     content += `[${title}](${url})`;
     try {
       const attachmentsFolder = `${this.settings.notesFolder}/.attachments`;
-      const preview = await fetchOg(this.app, attachmentsFolder, url);
+      const preview = await fetchOg(this.app, attachmentsFolder, url, this.settings.downloadImages);
       if (preview?.imageBasename) {
         content = `![[${preview.imageBasename}]]\n\n${content}`;
       }

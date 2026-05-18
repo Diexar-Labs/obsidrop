@@ -54,6 +54,7 @@ Google Keep is great - until you remember Google reads everything you put in the
 ### Capture
 - Android **share-target** - share any link, text, or image from any app
 - **Standalone Android app** for typing/dictating notes directly
+- **Voice memos** - one-tap recording on the dashboard, on both Android (`.m4a`) and the Obsidian plugin (`.webm`/opus); a confirmation dialog asks before saving, audio lands as a card with an equalizer-banner thumbnail
 - **Voice-to-text** on Android (uses system speech recognizer)
 - **OCR** on photos via ML Kit (text-recognition v2, bundled in APK - no Google Play Services needed)
 - **Link previews** (Open Graph) - paste a URL, get a card with title, image, and source
@@ -70,9 +71,11 @@ Google Keep is great - until you remember Google reads everything you put in the
 ### Edit
 - Inline **`- [ ]` checklists** with smart toolbar toggle
 - **Image embeds** (`![[image.jpg]]`) shown as thumbnails on the card
+- **Audio embeds** (`![[memo.m4a]]`) — inline player in both the Android editor and the Obsidian edit modal; tap a voice-memo card to play it back
 - **Lightbox** - tap a thumbnail to view full-screen, with "Open externally" fallback
 - **Auto-saves** as you type (and on back-button)
 - **Live preview** of pasted links
+- **Refcount-aware delete** — when you remove a card, its embedded image/audio is moved to the OS recycle bin too, but only if no other card (incl. Archive) still references it (so shared OG-thumbnails stay safe)
 
 ### Clip the web
 - **Chrome extension** companion - one-click clip of the current page into your vault as a Markdown note, tags included
@@ -166,6 +169,7 @@ UI in English (default) and Dutch. Skeletons exist for **Spanish, German, French
 - [x] Web clipper (Chrome extension)
 - [x] Tag-filter chips + bulk-select (multi-archive / multi-delete)
 - [x] Lightbox for image embeds
+- [x] Voice memos (record + playback, both platforms)
 - [ ] Submit to official Obsidian community-plugins register
 - [ ] iOS share-target (share-extension)
 - [ ] Firefox / Edge clipper (the Chrome extension is MV3, should port cleanly)

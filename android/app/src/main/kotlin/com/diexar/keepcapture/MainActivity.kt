@@ -56,6 +56,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setupSpeechLangSpinner()
+        setupDownloadImagesSwitch()
     }
 
     private fun openExternalUrl(url: String) {
@@ -87,6 +88,13 @@ class MainActivity : AppCompatActivity() {
             }
 
             override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+        }
+    }
+
+    private fun setupDownloadImagesSwitch() {
+        binding.downloadImagesSwitch.isChecked = Storage.getDownloadImages(this)
+        binding.downloadImagesSwitch.setOnCheckedChangeListener { _, isChecked ->
+            Storage.saveDownloadImages(this, isChecked)
         }
     }
 

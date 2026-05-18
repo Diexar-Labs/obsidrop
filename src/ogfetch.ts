@@ -63,6 +63,7 @@ export async function fetchOg(
   app: App,
   attachmentsFolder: string,
   url: string,
+  downloadImages = true,
 ): Promise<OgPreview | null> {
   try {
     if (/tiktok\.com/i.test(url)) {
@@ -72,7 +73,7 @@ export async function fetchOg(
       const canonical = /vm\.tiktok\.com|vt\.tiktok\.com/i.test(url)
         ? await resolveCanonicalUrl(url)
         : url;
-      return await fetchTikTokOEmbed(app, attachmentsFolder, canonical);
+      return await fetchTikTokOEmbed(app, attachmentsFolder, canonical, downloadImages);
     }
     const fetchUrl = rewriteForScraping(url);
 
@@ -109,12 +110,14 @@ export async function fetchOg(
       extractMeta(html, "twitter:description") ||
       extractMeta(html, "description");
     let imageBasename: string | null = null;
-    for (const candidate of rawImageCandidates) {
-      const absolute = absolutize(candidate, fetchUrl);
-      const basename = await downloadImage(app, attachmentsFolder, absolute);
-      if (basename) {
-        imageBasename = basename;
-        break;
+    if (downloadImages) {
+      for (const candidate of rawImageCandidates) {
+        const absolute = absolutize(candidate, fetchUrl);
+        const basename = await downloadImage(app, attachmentsFolder, absolute);
+        if (basename) {
+          imageBasename = basename;
+          break;
+        }
       }
     }
 
@@ -159,6 +162,7 @@ async function fetchTikTokOEmbed(
   app: App,
   attachmentsFolder: string,
   url: string,
+  downloadImages: boolean,
 ): Promise<OgPreview | null> {
   try {
     const oembedUrl = "https://www.tiktok.com/oembed?url=" + encodeURIComponent(url);
@@ -173,7 +177,7 @@ async function fetchTikTokOEmbed(
     const title = typeof json.title === "string" ? json.title : null;
     const author = typeof json.author_name === "string" ? json.author_name : null;
     const thumbnailUrl = typeof json.thumbnail_url === "string" ? json.thumbnail_url : null;
-    const imageBasename = thumbnailUrl
+    const imageBasename = (downloadImages && thumbnailUrl)
       ? await downloadImage(app, attachmentsFolder, thumbnailUrl)
       : null;
     const description = author ? `via @${author}` : null;
@@ -251,12 +255,14 @@ async function downloadImage(
     }
 
     const base = await hashName(imageUrl);
-    const ext = guessExtensionFromUrl(imageUrl) || "jpg";
-    const filename = `${base}.${ext}`;
-    const path = normalizePath(`${folder}/${filename}`);
+    const urlExt = guessExtensionFromUrl(imageUrl);
 
-    if (await app.vault.adapter.exists(path)) {
-      return filename;
+    // Fast dedup: if already saved with the URL-guessed extension, skip the download.
+    if (urlExt) {
+      const quickPath = normalizePath(`${folder}/${base}.${urlExt}`);
+      if (await app.vault.adapter.exists(quickPath)) {
+        return `${base}.${urlExt}`;
+      }
     }
 
     const headers = browserHeaders(CHROME_UA, {
@@ -269,12 +275,44 @@ async function downloadImage(
       return null;
     }
 
+    // Reject non-image responses — some servers return an HTML error page or a
+    // redirect to a login screen for image URLs, resulting in a Markdown file
+    // that Obsidian incorrectly treats as a PNG/JPEG.
+    const rawCt = (res.headers?.["content-type"] ?? "") as string;
+    const contentType = rawCt.split(";")[0].trim().toLowerCase();
+    if (contentType && !contentType.startsWith("image/")) {
+      console.warn(`ObsiDrop: skipping non-image response (${contentType}) for ${imageUrl}`);
+      return null;
+    }
+
+    // Prefer the content-type extension over the URL hint (more accurate).
+    const ext = extensionFromContentType(contentType) || urlExt || "jpg";
+    const filename = `${base}.${ext}`;
+    const path = normalizePath(`${folder}/${filename}`);
+
+    if (await app.vault.adapter.exists(path)) {
+      return filename;
+    }
+
     await app.vault.adapter.writeBinary(path, res.arrayBuffer);
     return filename;
   } catch (e) {
     console.error("ObsiDrop: image download failed:", e);
     return null;
   }
+}
+
+function extensionFromContentType(contentType: string): string | null {
+  const map: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif",
+    "image/avif": "avif",
+    "image/bmp": "bmp",
+  };
+  return map[contentType] ?? null;
 }
 
 function rewriteForScraping(url: string): string {

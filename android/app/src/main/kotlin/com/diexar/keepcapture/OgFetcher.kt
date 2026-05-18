@@ -76,7 +76,7 @@ object OgFetcher {
      * Haalt OG-meta op voor een URL en slaat de afbeelding op in de attachments-map.
      * Retourneert de basenaam van de afbeelding (bv. "a3f.jpg") of null bij fout.
      */
-    fun fetch(context: Context, url: String): Result<OgPreview> {
+    fun fetch(context: Context, url: String, downloadImages: Boolean = true): Result<OgPreview> {
         return try {
             // Speciale gevallen: sites die JS-renderen en hun OG via oEmbed serveren.
             if (url.contains("tiktok.com", ignoreCase = true)) {
@@ -87,7 +87,7 @@ object OgFetcher {
                     url.contains("vt.tiktok.com", ignoreCase = true)) {
                     resolveRedirects(url)
                 } else url
-                return fetchViaOEmbed(context, canonical, "https://www.tiktok.com/oembed?url=")
+                return fetchViaOEmbed(context, canonical, "https://www.tiktok.com/oembed?url=", downloadImages)
             }
             // Twitter/X blokkeert scrapers voor uitgelogde clients. fxtwitter.com is een mirror
             // die wél nette OG-meta serveert (gebruikt door Discord/Telegram embeds).
@@ -130,12 +130,14 @@ object OgFetcher {
             // Hola Gestoría heeft bijvoorbeeld een og:image die 404't — dan vallen
             // we automatisch terug op apple-touch-icon of body-img.
             var imageBasename: String? = null
-            for (candidate in rawImageCandidates) {
-                val absolute = absolutize(candidate, fetchUrl)
-                val basename = downloadImage(context, absolute).getOrNull()
-                if (basename != null) {
-                    imageBasename = basename
-                    break
+            if (downloadImages) {
+                for (candidate in rawImageCandidates) {
+                    val absolute = absolutize(candidate, fetchUrl)
+                    val basename = downloadImage(context, absolute).getOrNull()
+                    if (basename != null) {
+                        imageBasename = basename
+                        break
+                    }
                 }
             }
 
@@ -422,12 +424,18 @@ object OgFetcher {
                 return Result.failure(IllegalStateException("Afbeelding HTTP $code"))
             }
             val mime = conn.contentType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
+            // Reject HTML error pages, login redirects, etc. that the server serves
+            // on image URLs — these would otherwise be written as .png/.jpg files.
+            if (mime.isNotEmpty() && !mime.startsWith("image/")) {
+                return Result.failure(IllegalStateException("Geen afbeelding: content-type=$mime"))
+            }
             val ext = when {
                 mime.contains("jpeg") -> "jpg"
                 mime.contains("png") -> "png"
                 mime.contains("webp") -> "webp"
                 mime.contains("gif") -> "gif"
-                else -> urlString.substringAfterLast('.', "jpg")
+                mime.contains("avif") -> "avif"
+                else -> urlString.substringAfterLast('.', "")
                     .substringBefore('?')
                     .takeIf { it.length in 2..5 } ?: "jpg"
             }
@@ -552,7 +560,7 @@ object OgFetcher {
      * maar bieden wel een open oEmbed-endpoint dat JSON met `title`, `author_name`
      * en `thumbnail_url` teruggeeft. Dat parsen is robuuster dan HTML scrapen.
      */
-    private fun fetchViaOEmbed(context: Context, originalUrl: String, oembedBase: String): Result<OgPreview> {
+    private fun fetchViaOEmbed(context: Context, originalUrl: String, oembedBase: String, downloadImages: Boolean = true): Result<OgPreview> {
         return try {
             val encoded = URLEncoder.encode(originalUrl, "UTF-8")
             val json = downloadHtml(oembedBase + encoded).getOrElse {
@@ -561,7 +569,7 @@ object OgFetcher {
             val title = extractJsonString(json, "title")
             val author = extractJsonString(json, "author_name")
             val thumbnailUrl = extractJsonString(json, "thumbnail_url")
-            val imageBasename = thumbnailUrl?.let { downloadImage(context, it).getOrNull() }
+            val imageBasename = if (downloadImages) thumbnailUrl?.let { downloadImage(context, it).getOrNull() } else null
 
             val description = author?.takeIf { it.isNotBlank() }?.let { "via @$it" }
 

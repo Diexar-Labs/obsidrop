@@ -16,6 +16,8 @@ export interface ObsiDropSettings {
   sortMode: SortMode;
   cardWidth: number;
   showArchived: boolean;
+  /** Download the article thumbnail when capturing a URL. */
+  downloadImages: boolean;
   /** Whether the loopback HTTP server for the Chrome extension should be active. */
   clipServerEnabled: boolean;
   /** Port the loopback server listens on (127.0.0.1 only). */
@@ -30,6 +32,7 @@ export const DEFAULT_SETTINGS: ObsiDropSettings = {
   sortMode: "modified-desc",
   cardWidth: 240,
   showArchived: false,
+  downloadImages: true,
   clipServerEnabled: false,
   clipServerPort: 27124,
   clipServerToken: "",
@@ -118,6 +121,16 @@ export class ObsiDropSettingTab extends PluginSettingTab {
           this.plugin.settings.showArchived = value;
           await this.plugin.saveSettings();
           this.plugin.refreshViews();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName(t("settings_download_images"))
+      .setDesc(t("settings_download_images_desc"))
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.downloadImages).onChange(async (value) => {
+          this.plugin.settings.downloadImages = value;
+          await this.plugin.saveSettings();
         })
       );
 

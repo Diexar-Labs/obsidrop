@@ -38,6 +38,7 @@ export class EditNoteModal extends Modal {
   private originalEmbeds: string[] = [];
   private bodyEl!: HTMLTextAreaElement;
   private chipsEl!: HTMLElement;
+  private tagInputEl: HTMLInputElement | null = null;
 
   constructor(app: App, plugin: ObsiDropPlugin, file: TFile) {
     super(app);
@@ -197,42 +198,45 @@ export class EditNoteModal extends Modal {
       }
     });
 
-    // Tags + chip input
+    // Tags + chip input — input lives inside the chips container so it always
+    // follows the last chip, even when chips wrap to a new line.
     const tagWrap = parent.createDiv({ cls: "obsidrop-edit-tagrow" });
     tagWrap.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
     this.chipsEl = tagWrap.createDiv({ cls: "obsidrop-edit-chips" });
+    this.tagInputEl = null;
     this.renderChips();
 
-    const tagInput = tagWrap.createEl("input", {
+    this.tagInputEl = this.chipsEl.createEl("input", {
       cls: "obsidrop-edit-taginput",
       attr: { type: "text", placeholder: t("tag_input_placeholder") },
     });
     const datalistId = `obsidrop-tagcompletion-${Date.now()}`;
     const datalist = tagWrap.createEl("datalist", { attr: { id: datalistId } });
-    tagInput.setAttribute("list", datalistId);
+    this.tagInputEl.setAttribute("list", datalistId);
     for (const tag of getAllVaultTags(this.app)) {
       datalist.createEl("option", { attr: { value: tag } });
     }
     const commit = () => {
-      const value = tagInput.value.replace(/^#/, "").trim();
+      if (!this.tagInputEl) return;
+      const value = this.tagInputEl.value.replace(/^#/, "").trim();
       if (value && !this.state.tags.includes(value)) {
         this.state.tags.push(value);
         this.renderChips();
       }
-      tagInput.value = "";
+      this.tagInputEl.value = "";
     };
-    tagInput.addEventListener("keydown", (e) => {
+    this.tagInputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
-        if (tagInput.value.trim()) {
+        if (this.tagInputEl?.value.trim()) {
           e.preventDefault();
           commit();
         }
-      } else if (e.key === "Backspace" && tagInput.value === "" && this.state.tags.length > 0) {
+      } else if (e.key === "Backspace" && this.tagInputEl?.value === "" && this.state.tags.length > 0) {
         this.state.tags.pop();
         this.renderChips();
       }
     });
-    tagInput.addEventListener("blur", commit);
+    this.tagInputEl.addEventListener("blur", commit);
   }
 
   private renderChips(): void {
@@ -247,6 +251,8 @@ export class EditNoteModal extends Modal {
         this.renderChips();
       });
     }
+    // Keep the input at the end of the chips container after re-render.
+    if (this.tagInputEl) this.chipsEl.appendChild(this.tagInputEl);
   }
 
   private insertLinkAtCursor(linkPath: string): void {
@@ -264,9 +270,10 @@ export class EditNoteModal extends Modal {
   }
 
   /**
-   * Shows the first embedded image as a clickable thumbnail at the top of the
-   * modal. Embed lines are not in the text field (they are re-added on save),
-   * so without this thumbnail the image would be inaccessible from the edit modal.
+   * Shows the first embedded attachment as a thumbnail (image) of inline
+   * audio player (m4a/webm/etc.) at the top of the modal. Embed lines are
+   * not in the text field (they are re-added on save), so without this
+   * preview the attachment would be inaccessible from the edit modal.
    */
   private renderEmbedThumbnail(parent: HTMLElement): void {
     if (this.state.embedLines.length === 0) return;
@@ -275,6 +282,16 @@ export class EditNoteModal extends Modal {
     const basename = match[1].trim();
     const resolved = this.resolveAttachment(basename);
     if (!resolved) return;
+
+    if (/\.(m4a|mp3|wav|ogg|aac|flac|3gp|amr|webm)$/i.test(basename)) {
+      const wrap = parent.createDiv({ cls: "obsidrop-edit-audio" });
+      const audio = wrap.createEl("audio");
+      audio.controls = true;
+      audio.src = resolved.resourcePath;
+      audio.preload = "metadata";
+      audio.addEventListener("error", () => wrap.remove());
+      return;
+    }
 
     const wrap = parent.createDiv({ cls: "obsidrop-edit-thumbnail" });
     const img = wrap.createEl("img");

@@ -44,6 +44,38 @@
   align-items: center;
 }
 
+.obsidrop-mic-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
+.obsidrop-mic-btn:hover {
+  background: var(--background-modifier-hover);
+}
+
+/* Recording state: shape changes (circle with square icon instead of mic) and
+   colour jumps to error-colour. Shape is the primary signal; colour confirms. */
+.obsidrop-mic-btn.is-recording {
+  background: var(--background-modifier-error);
+  border-color: var(--background-modifier-error-hover);
+  color: var(--text-on-accent);
+  animation: obsidrop-mic-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes obsidrop-mic-pulse {
+  0%, 100% { transform: scale(1.0); }
+  50% { transform: scale(1.08); }
+}
+
 .obsidrop-search {
   flex: 1;
   max-width: 360px;
@@ -474,6 +506,37 @@
   object-fit: cover;
 }
 
+.obsidrop-card-voice-banner {
+  margin: -12px -14px 10px;
+  border-radius: 10px 10px 0 0;
+  background: var(--background-secondary);
+  aspect-ratio: 16 / 9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.obsidrop-card-voice-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  opacity: 0.85;
+}
+
+.obsidrop-card-voice-icon svg {
+  width: 56px;
+  height: 56px;
+}
+
+.obsidrop-edit-audio {
+  margin-bottom: 12px;
+}
+
+.obsidrop-edit-audio audio {
+  width: 100%;
+}
+
 .obsidrop-card-title {
   font-size: 1em;
   font-weight: 600;
@@ -787,12 +850,17 @@
   min-width: 40px;
 }
 
-.obsidrop-edit-colorrow,
-.obsidrop-edit-tagrow {
+.obsidrop-edit-colorrow {
   display: flex;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+.obsidrop-edit-tagrow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
 }
 
 .obsidrop-edit-row {
@@ -872,6 +940,9 @@
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
+  flex: 1;
+  align-items: center;
+  min-width: 0;
 }
 
 .obsidrop-edit-chip {

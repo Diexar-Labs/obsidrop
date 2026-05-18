@@ -6,6 +6,7 @@ import { LightboxModal } from "./lightbox";
 import { FolderPickerModal } from "./folderPicker";
 import { TagPickerModal, TagItem } from "./tagPicker";
 import { ConfirmModal } from "./confirmModal";
+import { VoiceMemoRecorder, RecordResult } from "./recorder";
 import {
   colorLabel,
   COLOR_NAMES,
@@ -28,6 +29,60 @@ const PREVIEW_MAX_WORDS = 25;
 const LINK_CHIPS_VISIBLE = 3;
 const TAG_CHIPS_TOP_N = 8;
 const LONG_PRESS_MS = 500;
+
+// Mirrors Storage.findEmbeddedImageBasenames / findEmbeddedAudioBasenames in
+// the Android app. Covers both Obsidian-style `![[name.ext]]` and standard
+// `![](path/name.ext)`. Both forms are extension-filtered — otherwise a
+// `![[memo.m4a]]` ends up in image detection and the card thumbnail slot
+// reserves space for an image that never loads.
+const EMBED_OBSIDIAN_RE = /!\[\[([^\]\n|]+)(?:\|[^\]\n]+)?\]\]/g;
+const EMBED_STANDARD_RE = /!\[[^\]]*\]\(([^)\s]+)(?:\s+"[^"]*")?\)/g;
+const IMAGE_EXT_RE = /\.(jpg|jpeg|png|gif|webp|bmp|svg)$/i;
+const AUDIO_EXT_RE = /\.(m4a|mp3|wav|ogg|aac|flac|3gp|amr|webm)$/i;
+
+function collectEmbedBasenames(content: string, accept: (name: string) => boolean): string[] {
+  const result = new Set<string>();
+  for (const m of content.matchAll(EMBED_OBSIDIAN_RE)) {
+    const name = m[1].trim().split("/").pop() ?? "";
+    if (name && accept(name)) result.add(name);
+  }
+  for (const m of content.matchAll(EMBED_STANDARD_RE)) {
+    const path = m[1].trim();
+    const name = (path.split("/").pop() ?? "").split("?")[0].split("#")[0];
+    if (name && accept(name)) result.add(name);
+  }
+  return Array.from(result);
+}
+
+function findEmbeddedImageBasenames(content: string): string[] {
+  return collectEmbedBasenames(content, (n) => IMAGE_EXT_RE.test(n));
+}
+
+function findEmbeddedAudioBasenames(content: string): string[] {
+  return collectEmbedBasenames(content, (n) => AUDIO_EXT_RE.test(n));
+}
+
+/** Image + audio combined — used by the delete flow for refcount + cleanup. */
+function findEmbeddedAttachmentBasenames(content: string): string[] {
+  return collectEmbedBasenames(content, (n) => IMAGE_EXT_RE.test(n) || AUDIO_EXT_RE.test(n));
+}
+
+function isAudioBasename(name: string): boolean {
+  return AUDIO_EXT_RE.test(name);
+}
+
+function formatMemoDuration(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const minutes = Math.floor(totalSec / 60);
+  const seconds = totalSec % 60;
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`;
+}
+
+function formatStamp(date: Date): string {
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ` +
+    `${pad(date.getHours())}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+}
 const LONG_PRESS_MOVE_THRESHOLD_PX = 10;
 
 interface CardData {
@@ -51,6 +106,8 @@ export class ObsiDropView extends ItemView {
   private selectionMode = false;
   private selectedPaths = new Set<string>();
   private lastFiltered: CardData[] = [];
+  private micBtnEl: HTMLButtonElement | null = null;
+  private recorder: VoiceMemoRecorder | null = null;
 
   constructor(leaf: WorkspaceLeaf, plugin: ObsiDropPlugin) {
     super(leaf);
@@ -82,6 +139,13 @@ export class ObsiDropView extends ItemView {
     newBtn.addEventListener("click", () => {
       new QuickCaptureModal(this.app, this.plugin).open();
     });
+
+    this.micBtnEl = this.normalToolbarEl.createEl("button", {
+      cls: "obsidrop-mic-btn",
+      attr: { "aria-label": t("action_start_recording") },
+    });
+    setIcon(this.micBtnEl, "mic");
+    this.micBtnEl.addEventListener("click", () => void this.toggleRecord());
 
     this.searchEl = this.normalToolbarEl.createEl("input", {
       cls: "obsidrop-search",
@@ -229,6 +293,101 @@ export class ObsiDropView extends ItemView {
     }
   }
 
+  /**
+   * One button starts and stops recording. The stop path opens a confirm
+   * modal with duration + Save/Cancel. Mic permission is requested by the
+   * browser/Electron on `getUserMedia` — no separate permission flow needed.
+   */
+  private async toggleRecord(): Promise<void> {
+    if (this.recorder?.isRecording()) {
+      const result = await this.recorder.stop();
+      this.setMicButtonState(false);
+      this.recorder = null;
+      if (!result) {
+        new Notice(t("record_too_short"));
+        return;
+      }
+      this.openRecordConfirm(result);
+      return;
+    }
+    try {
+      const rec = new VoiceMemoRecorder();
+      await rec.start();
+      this.recorder = rec;
+      this.setMicButtonState(true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(t("record_start_failed", msg));
+    }
+  }
+
+  private setMicButtonState(recording: boolean): void {
+    if (!this.micBtnEl) return;
+    this.micBtnEl.empty();
+    setIcon(this.micBtnEl, recording ? "square" : "mic");
+    this.micBtnEl.toggleClass("is-recording", recording);
+    this.micBtnEl.setAttribute(
+      "aria-label",
+      t(recording ? "action_stop_recording" : "action_start_recording"),
+    );
+  }
+
+  private openRecordConfirm(result: RecordResult): void {
+    const durationLabel = formatMemoDuration(result.durationMs);
+    new ConfirmModal(
+      this.app,
+      {
+        title: t("record_confirm_title"),
+        message: t("record_confirm_message", durationLabel),
+        confirmLabel: t("action_save"),
+      },
+      () => void this.saveVoiceMemo(result),
+    ).open();
+  }
+
+  private async saveVoiceMemo(result: RecordResult): Promise<void> {
+    const stamp = formatStamp(new Date());
+    const basename = `diexar-${stamp}.${result.extension}`;
+    const notesFolder = this.plugin.settings.notesFolder;
+    const attachmentsDir = normalizePath(`${notesFolder}/.attachments`);
+    const attachmentPath = normalizePath(`${attachmentsDir}/${basename}`);
+    try {
+      if (!(await this.app.vault.adapter.exists(attachmentsDir))) {
+        await this.app.vault.adapter.mkdir(attachmentsDir);
+      }
+      const buf = await result.blob.arrayBuffer();
+      await this.app.vault.adapter.writeBinary(attachmentPath, buf);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(t("record_save_failed", msg));
+      return;
+    }
+
+    const durationLabel = formatMemoDuration(result.durationMs);
+    const title = `Voicememo ${stamp}`;
+    const body = [
+      `# ${title}`,
+      "",
+      `![[${basename}]]`,
+      "",
+      durationLabel,
+      "",
+    ].join("\n");
+    const safeTitle = title.replace(/[\\/:*?"<>|]/g, "");
+    const notePath = normalizePath(`${notesFolder}/${safeTitle}.md`);
+    try {
+      if (!(await this.app.vault.adapter.exists(notesFolder))) {
+        await this.app.vault.adapter.mkdir(notesFolder);
+      }
+      await this.app.vault.create(notePath, body);
+      new Notice(t("record_saved"));
+      void this.render();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      new Notice(t("record_save_failed", msg));
+    }
+  }
+
   private confirmBulkArchive(): void {
     const count = this.selectedPaths.size;
     if (count === 0) return;
@@ -296,6 +455,10 @@ export class ObsiDropView extends ItemView {
 
   private async bulkDelete(): Promise<void> {
     const paths = Array.from(this.selectedPaths);
+    // Refcount set pre-computed once: OG thumbnails are URL-hashed and can be
+    // shared between cards. Only attachments that are not referenced anywhere
+    // outside the selection may go to the trash.
+    const stillReferenced = await this.collectReferencedAttachmentBasenames(new Set(paths));
     let ok = 0;
     let fail = 0;
     for (const path of paths) {
@@ -305,9 +468,7 @@ export class ObsiDropView extends ItemView {
         continue;
       }
       try {
-        // System trash instead of .trash/ — puts it in the OS recycle bin so
-        // recovery is possible; aligned with the single-card delete flow.
-        await this.app.vault.trash(file, true);
+        await this.trashNoteWithOrphanedAttachments(file, stillReferenced);
         ok++;
       } catch {
         fail++;
@@ -315,6 +476,80 @@ export class ObsiDropView extends ItemView {
     }
     this.reportBulkResult("notice_bulk_deleted", ok, fail);
     this.exitSelection();
+  }
+
+  /**
+   * Scans all markdown files in the vault — excluding [excludePaths] —
+   * and returns the set of attachment basenames still in use. Mirrors
+   * Storage.collectReferencedAttachments() in the Android app.
+   */
+  private async collectReferencedAttachmentBasenames(
+    excludePaths: Set<string>,
+  ): Promise<Set<string>> {
+    const result = new Set<string>();
+    for (const f of this.app.vault.getMarkdownFiles()) {
+      if (excludePaths.has(f.path)) continue;
+      try {
+        const content = await this.app.vault.cachedRead(f);
+        for (const name of findEmbeddedAttachmentBasenames(content)) result.add(name);
+      } catch {
+        // An unreadable file must not block the cleanup.
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Deletes orphaned attachments first (basenames not in [stillReferenced])
+   * and then the note itself — both to the OS recycle bin so recovery is
+   * possible. Attachments are looked up via multiple candidate paths because
+   * Obsidian's metadataCache skips dot-prefixed folders (`.attachments/`).
+   */
+  private async trashNoteWithOrphanedAttachments(
+    file: TFile,
+    stillReferenced: Set<string>,
+  ): Promise<void> {
+    try {
+      const content = await this.app.vault.cachedRead(file);
+      for (const name of findEmbeddedAttachmentBasenames(content)) {
+        if (stillReferenced.has(name)) continue;
+        await this.trashAttachmentByBasename(file, name);
+      }
+    } catch {
+      // Cleanup failures must not block the note deletion.
+    }
+    await this.app.vault.trash(file, true);
+  }
+
+  private async trashAttachmentByBasename(noteFile: TFile, basename: string): Promise<void> {
+    const dest = this.app.metadataCache.getFirstLinkpathDest(basename, noteFile.path);
+    if (dest) {
+      try {
+        await this.app.vault.trash(dest, true);
+        return;
+      } catch {
+        // fall through to adapter lookup
+      }
+    }
+    const candidates: string[] = [];
+    const noteFolder = noteFile.parent?.path ?? "";
+    if (noteFolder) candidates.push(`${noteFolder}/.attachments/${basename}`);
+    else candidates.push(`.attachments/${basename}`);
+    const configured = this.plugin.settings.notesFolder;
+    if (configured && configured !== noteFolder) {
+      candidates.push(`${configured}/.attachments/${basename}`);
+    }
+    for (const p of candidates) {
+      const np = normalizePath(p);
+      try {
+        if (await this.app.vault.adapter.exists(np)) {
+          await this.app.vault.adapter.trashSystem(np);
+          return;
+        }
+      } catch {
+        // try next candidate
+      }
+    }
   }
 
   /**
@@ -389,6 +624,9 @@ export class ObsiDropView extends ItemView {
   }
 
   async onClose(): Promise<void> {
+    // Release the mic stream if the view closes mid-recording.
+    this.recorder?.discard();
+    this.recorder = null;
     this.contentEl.empty();
   }
 
@@ -629,6 +867,9 @@ export class ObsiDropView extends ItemView {
     const attachment = thumbnailBasename
       ? this.resolveAttachmentResource(file, thumbnailBasename)
       : null;
+    // Voice-memo cards have no image thumb but do have an audio embed —
+    // show an equalizer banner so the card type is visually recognizable.
+    const audioBasename = attachment ? null : extractFirstEmbeddedAudio(content);
 
     // Body click = always edit (or toggle when in selection mode).
     // Thumbnail gets its own handler with stopPropagation for the lightbox,
@@ -658,6 +899,11 @@ export class ObsiDropView extends ItemView {
           attachment.vaultPath,
         ).open();
       });
+    } else if (audioBasename) {
+      const banner = body.createDiv({ cls: "obsidrop-card-voice-banner" });
+      banner.setAttribute("aria-label", t("voice_memo_card_label"));
+      const iconEl = banner.createSpan({ cls: "obsidrop-card-voice-icon" });
+      setIcon(iconEl, "audio-lines");
     }
 
     body.createEl("h3", { cls: "obsidrop-card-title", text: titleText });
@@ -819,7 +1065,10 @@ export class ObsiDropView extends ItemView {
           .setTitle(t("action_delete"))
           .setIcon("trash-2")
           .onClick(async () => {
-            await this.app.vault.trash(file, true);
+            const stillReferenced = await this.collectReferencedAttachmentBasenames(
+              new Set([file.path]),
+            );
+            await this.trashNoteWithOrphanedAttachments(file, stillReferenced);
             new Notice(t("notice_deleted", file.basename));
             this.plugin.refreshViews();
           })
@@ -1158,25 +1407,15 @@ function hostnameOf(url: string): string {
 }
 
 /**
- * Finds the basename of the first embedded image in the note.
- * Supports both Obsidian wikilinks `![[file.jpg]]` and markdown `![](path)`.
+ * Finds the basename of the first embedded image in the note (extension-
+ * filtered — voice memos are handled separately via [extractFirstEmbeddedAudio]).
  */
 function extractFirstEmbeddedImage(content: string): string | null {
-  const body = stripFrontmatter(content);
-  const wiki = body.match(/!\[\[([^\]|]+?)\]\]/);
-  if (wiki) {
-    return wiki[1].trim().split("|")[0].trim();
-  }
-  const md = body.match(/!\[[^\]]*\]\(([^)]+)\)/);
-  if (md) {
-    const url = md[1].trim();
-    // For local paths: take the basename. For http(s) do nothing (no local resolve).
-    if (/^https?:\/\//i.test(url)) return null;
-    const clean = url.split("#")[0].split("?")[0];
-    const parts = clean.split("/");
-    return parts[parts.length - 1] || null;
-  }
-  return null;
+  return findEmbeddedImageBasenames(stripFrontmatter(content))[0] ?? null;
+}
+
+function extractFirstEmbeddedAudio(content: string): string | null {
+  return findEmbeddedAudioBasenames(stripFrontmatter(content))[0] ?? null;
 }
 
 // Kept for backwards-compat in case main.ts imported this. No longer used.

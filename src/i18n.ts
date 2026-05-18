@@ -52,6 +52,16 @@ const EN: Record<string, string> = {
   action_checklist: "☑ Checklist item",
   action_new_note: "New note",
   action_edit_note: "Edit note",
+  action_start_recording: "Record voice memo",
+  action_stop_recording: "Stop recording",
+  record_start_failed: "Could not start recording: {0}",
+  record_too_short: "Recording too short or failed.",
+  record_save_failed: "Could not save voice memo: {0}",
+  record_saved: "Voice memo saved.",
+  record_confirm_title: "Save voice memo?",
+  record_confirm_message: "Voice memo of {0} — save it as a new card?",
+  audio_load_failed: "Audio unavailable",
+  voice_memo_card_label: "Voice memo",
   lightbox_open_in_tab: "Open image in tab",
   lightbox_open_external: "Open externally",
   lightbox_load_failed: "Image could not be loaded.",
@@ -139,6 +149,9 @@ const EN: Record<string, string> = {
   settings_show_archived: "Show archive",
   settings_show_archived_desc:
     "Also show archived cards in the main view.",
+  settings_download_images: "Save article images",
+  settings_download_images_desc:
+    "Download the article thumbnail and save it in your vault when capturing a URL. Turn off to save only the title and link.",
 
   // Clip server (Chrome extension)
   settings_clip_server_section: "Web clipper (Chrome extension)",
@@ -216,6 +229,16 @@ const NL: Record<string, string> = {
   action_insert_link: "🔗 Link invoegen",
   action_checklist: "☑ Checklist-item",
   action_new_note: "Nieuwe notitie",
+  action_start_recording: "Voicememo opnemen",
+  action_stop_recording: "Opname stoppen",
+  record_start_failed: "Opname kon niet starten: {0}",
+  record_too_short: "Opname te kort of mislukt.",
+  record_save_failed: "Voicememo kon niet worden opgeslagen: {0}",
+  record_saved: "Voicememo opgeslagen.",
+  record_confirm_title: "Voicememo opslaan?",
+  record_confirm_message: "Voicememo van {0} — opslaan als nieuwe kaart?",
+  audio_load_failed: "Audio niet beschikbaar",
+  voice_memo_card_label: "Voicememo",
   action_edit_note: "Notitie bewerken",
   lightbox_open_in_tab: "Afbeelding in tab openen",
   lightbox_open_external: "Extern openen",
@@ -298,6 +321,9 @@ const NL: Record<string, string> = {
   settings_show_archived: "Toon archief",
   settings_show_archived_desc:
     "Laat ook gearchiveerde kaartjes zien in de hoofdweergave.",
+  settings_download_images: "Artikel-afbeeldingen opslaan",
+  settings_download_images_desc:
+    "Download de thumbnail van een artikel en sla die op in je vault bij het vastleggen van een URL. Zet uit om alleen titel en link op te slaan.",
 
   settings_clip_server_section: "Web-clipper (Chrome-extensie)",
   settings_clip_server_desc:

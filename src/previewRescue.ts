@@ -149,7 +149,7 @@ export class PreviewRescue {
     if (!url) return;
 
     const attachmentsFolder = `${this.plugin.settings.notesFolder}/.attachments`;
-    const preview = await fetchOg(this.plugin.app, attachmentsFolder, url);
+    const preview = await fetchOg(this.plugin.app, attachmentsFolder, url, this.plugin.settings.downloadImages);
     if (!preview) return;
 
     // Race check: read once more just before the write — if the marker

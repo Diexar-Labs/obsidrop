@@ -14,6 +14,7 @@ object Storage {
     private const val KEY_VAULT_URI = "vault_tree_uri"
     private const val KEY_SUBFOLDER = "subfolder"
     private const val KEY_SPEECH_LANG = "speech_language"
+    private const val KEY_DOWNLOAD_IMAGES = "download_images"
     const val DEFAULT_SUBFOLDER = "Mini Notes"
     const val DEFAULT_SPEECH_LANG = "nl-NL"
 
@@ -65,6 +66,18 @@ object Storage {
         PreferenceManager.getDefaultSharedPreferences(context)
             .edit()
             .putString(KEY_SPEECH_LANG, if (valid) lang else DEFAULT_SPEECH_LANG)
+            .apply()
+    }
+
+    fun getDownloadImages(context: Context): Boolean {
+        return PreferenceManager.getDefaultSharedPreferences(context)
+            .getBoolean(KEY_DOWNLOAD_IMAGES, true)
+    }
+
+    fun saveDownloadImages(context: Context, enabled: Boolean) {
+        PreferenceManager.getDefaultSharedPreferences(context)
+            .edit()
+            .putBoolean(KEY_DOWNLOAD_IMAGES, enabled)
             .apply()
     }
 
@@ -179,6 +192,56 @@ object Storage {
     }
 
     /**
+     * Kopieert een lokaal opgenomen voicememo (cache-bestand) naar `.attachments`
+     * en maakt een notitie met een Obsidian-style audio-embed + duur-regel.
+     * Het bron-bestand wordt na succesvolle kopie verwijderd.
+     */
+    fun saveVoiceMemoNote(
+        context: Context,
+        sourceFile: java.io.File,
+        durationMs: Long,
+    ): Result<String> {
+        val attachmentsFolder = getOrCreateAttachmentsFolder(context).getOrElse {
+            return Result.failure(it)
+        }
+        val stamp = SimpleDateFormat("yyyy-MM-dd HHmmss", Locale.US).format(Date())
+        val basename = "diexar-$stamp.m4a"
+        val target = attachmentsFolder.createFile("audio/mp4", basename)
+            ?: return Result.failure(IllegalStateException("Kan voicememo-bestand niet aanmaken."))
+        try {
+            sourceFile.inputStream().use { input ->
+                context.contentResolver.openOutputStream(target.uri, "wt")?.use { out ->
+                    input.copyTo(out)
+                } ?: run {
+                    target.delete()
+                    return Result.failure(IllegalStateException("Kan voicememo niet schrijven."))
+                }
+            }
+        } catch (e: Exception) {
+            target.delete()
+            return Result.failure(e)
+        }
+        sourceFile.delete()
+
+        val durationLabel = formatDuration(durationMs)
+        val title = "Voicememo $stamp"
+        val body = buildString {
+            append("# "); append(title); append("\n\n")
+            append("![["); append(basename); append("]]\n\n")
+            append(durationLabel)
+        }
+        return saveNote(context, body)
+    }
+
+    /** Formatteert milliseconden als `M:SS`. */
+    private fun formatDuration(ms: Long): String {
+        val totalSec = (ms / 1000).coerceAtLeast(0)
+        val minutes = totalSec / 60
+        val seconds = totalSec % 60
+        return "%d:%02d".format(minutes, seconds)
+    }
+
+    /**
      * Kopieert een afbeelding (lokaal of via content-URI) naar `.attachments` en
      * retourneert de basename voor gebruik in een `![[…]]`-embed. Gebruikt door
      * zowel saveImageNote (nieuwe foto-notitie) als de editor (foto invoegen in
@@ -267,6 +330,9 @@ object Storage {
             val preview = readPreview(context, child.uri)
             val parsed = FrontmatterParser.parse(preview)
             val firstImage = findEmbeddedImageBasenames(parsed.body).firstOrNull()
+            val firstAudio = if (firstImage == null) {
+                findEmbeddedAudioBasenames(parsed.body).firstOrNull()
+            } else null
             NoteSummary(
                 uri = child.uri,
                 filename = child.name,
@@ -277,6 +343,7 @@ object Storage {
                 meta = parsed.meta,
                 thumbnailBasename = firstImage,
                 thumbnailUri = firstImage?.let { attachments[it] },
+                audioBasename = firstAudio,
             )
         }
         return Result.success(notes)
@@ -357,17 +424,30 @@ object Storage {
 
     fun deleteNote(context: Context, uri: Uri): Result<Unit> {
         return try {
-            // Vóór verwijderen: zoek alle ingebedde afbeeldingen en verwijder die ook.
+            // Vóór verwijderen: zoek ingebedde afbeeldingen en verwijder die ook —
+            // mits geen andere notitie (Mini Notes of Archive) er nog naar verwijst.
+            // OG-thumbnails worden door OgFetcher gehasht op URL en kunnen dus gedeeld
+            // worden tussen kaarten met dezelfde og:image — wis nooit zo'n shared file.
             val content = readNote(context, uri).getOrNull() ?: ""
-            val embeddedImages = findEmbeddedImageBasenames(content)
+            val embeddedImages = findEmbeddedAttachmentBasenames(content)
             if (embeddedImages.isNotEmpty()) {
-                val attachments = traverseSubfolder(
-                    DocumentFile.fromTreeUri(context, getVaultUri(context) ?: return Result.failure(IllegalStateException("Geen vault."))) ?: return Result.failure(IllegalStateException("Vault niet open.")),
-                    getSubfolder(context).trimEnd('/') + "/.attachments",
-                )
-                if (attachments != null) {
-                    for (name in embeddedImages) {
-                        attachments.findFile(name)?.delete()
+                val vaultUri = getVaultUri(context)
+                if (vaultUri != null) {
+                    val stillReferenced = collectReferencedAttachments(context, vaultUri, uri)
+                    val toRemove = embeddedImages.filter { it !in stillReferenced }
+                    if (toRemove.isNotEmpty()) {
+                        // Cursor-based snapshot — DocumentFile.findFile() bleek
+                        // onbetrouwbaar op SAF-mappen die Syncthing extern aanpast.
+                        val snapshot = snapshotAttachments(context, vaultUri)
+                        for (name in toRemove) {
+                            val attUri = snapshot[name] ?: continue
+                            try {
+                                DocumentsContract.deleteDocument(context.contentResolver, attUri)
+                            } catch (_: Exception) {
+                                // Individuele attachment-failure mag het verwijderen
+                                // van de .md niet blokkeren.
+                            }
+                        }
                     }
                 }
             }
@@ -379,6 +459,46 @@ object Storage {
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    /**
+     * Verzamelt alle attachment-basenames die nog gerefereerd worden door notities
+     * in de Notes-map én in Archive, met uitzondering van [excludeUri]. Gebruikt
+     * door [deleteNote] om gedeelde OG-thumbnails te beschermen.
+     */
+    private fun collectReferencedAttachments(
+        context: Context,
+        vaultUri: Uri,
+        excludeUri: Uri,
+    ): Set<String> {
+        val excludeKey = excludeUri.toString()
+        val result = HashSet<String>()
+
+        val notesFolder = openNotesFolder(context).getOrNull()
+        if (notesFolder != null) {
+            for (child in queryChildren(context, vaultUri, notesFolder.uri)) {
+                if (child.name.startsWith(".") || !child.name.endsWith(".md", true)) continue
+                if (child.uri.toString() == excludeKey) continue
+                val body = readNote(context, child.uri).getOrNull() ?: continue
+                result.addAll(findEmbeddedAttachmentBasenames(body))
+            }
+        }
+
+        val tree = DocumentFile.fromTreeUri(context, vaultUri)
+        if (tree != null) {
+            val archivePath = getSubfolder(context).trimEnd('/') + "/Archive"
+            val archive = traverseSubfolder(tree, archivePath)
+            if (archive != null) {
+                for (child in queryChildren(context, vaultUri, archive.uri)) {
+                    if (!child.name.endsWith(".md", true)) continue
+                    if (child.uri.toString() == excludeKey) continue
+                    val body = readNote(context, child.uri).getOrNull() ?: continue
+                    result.addAll(findEmbeddedAttachmentBasenames(body))
+                }
+            }
+        }
+
+        return result
     }
 
     /**
@@ -413,19 +533,38 @@ object Storage {
     /**
      * Detecteert ingebedde afbeeldingen in een markdown-body. Dekt zowel
      * Obsidian-stijl `![[name.ext]]` als standaard `![](path/name.ext)`.
+     * Filtert op image-extensies; voicememo's (.m4a etc.) komen hier NIET in.
      */
     fun findEmbeddedImageBasenames(content: String): List<String> {
+        return collectEmbedBasenames(content) { looksLikeImage(it) }
+    }
+
+    /** Zoals [findEmbeddedImageBasenames] maar voor audio-attachments (voicememo's). */
+    fun findEmbeddedAudioBasenames(content: String): List<String> {
+        return collectEmbedBasenames(content) { looksLikeAudio(it) }
+    }
+
+    /**
+     * Levert álle ingebedde attachment-basenames (image + audio). Gebruikt door
+     * [deleteNote] om bij verwijderen ook audio-bestanden refcount-aware mee te
+     * nemen — anders blijven `.m4a`-bestanden in `.attachments/` rondhangen.
+     */
+    fun findEmbeddedAttachmentBasenames(content: String): List<String> {
+        return collectEmbedBasenames(content) { looksLikeImage(it) || looksLikeAudio(it) }
+    }
+
+    private fun collectEmbedBasenames(content: String, accept: (String) -> Boolean): List<String> {
         val result = LinkedHashSet<String>()
         val obsidian = Regex("!\\[\\[([^\\]\\n|]+)(?:\\|[^\\]\\n]+)?\\]\\]")
         for (m in obsidian.findAll(content)) {
             val name = m.groupValues[1].trim().substringAfterLast('/')
-            if (name.isNotEmpty()) result.add(name)
+            if (name.isNotEmpty() && accept(name)) result.add(name)
         }
         val standard = Regex("!\\[[^\\]]*\\]\\(([^)\\s]+)(?:\\s+\"[^\"]*\")?\\)")
         for (m in standard.findAll(content)) {
             val path = m.groupValues[1].trim()
             val name = path.substringAfterLast('/').substringBefore('?').substringBefore('#')
-            if (name.isNotEmpty() && looksLikeImage(name)) result.add(name)
+            if (name.isNotEmpty() && accept(name)) result.add(name)
         }
         return result.toList()
     }
@@ -433,6 +572,11 @@ object Storage {
     private fun looksLikeImage(name: String): Boolean {
         val ext = name.substringAfterLast('.', "").lowercase()
         return ext in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "svg")
+    }
+
+    private fun looksLikeAudio(name: String): Boolean {
+        val ext = name.substringAfterLast('.', "").lowercase()
+        return ext in setOf("m4a", "mp3", "wav", "ogg", "aac", "flac", "3gp", "amr")
     }
 
     fun archiveNote(context: Context, uri: Uri): Result<Unit> {
@@ -651,6 +795,7 @@ data class NoteSummary(
     val meta: NoteMeta = NoteMeta(),
     val thumbnailBasename: String? = null,
     val thumbnailUri: Uri? = null,
+    val audioBasename: String? = null,
 )
 
 data class VaultMarkdownFile(

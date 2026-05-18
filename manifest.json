@@ -1,7 +1,7 @@
 {
   "id": "obsidrop",
   "name": "ObsiDrop",
-  "version": "0.12.0",
+  "version": "0.13.0",
   "minAppVersion": "1.5.0",
   "description": "Google Keep–style quick-capture card grid for Obsidian. Capture notes on Android via the companion app and see them as cards in your vault. Offline, no account, every note is plain Markdown.",
   "author": "Diexar Labs",

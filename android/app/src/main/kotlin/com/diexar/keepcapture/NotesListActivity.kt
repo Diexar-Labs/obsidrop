@@ -1,6 +1,8 @@
 package com.diexar.keepcapture
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Bundle
 import android.text.format.DateUtils
@@ -9,6 +11,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -48,12 +51,15 @@ import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DoneAll
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Done
+import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.RadioButtonUnchecked
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.AlertDialog
@@ -131,6 +137,22 @@ class NotesListActivity : ComponentActivity() {
     // de result-callback of er na de copy ook nog OCR moet draaien.
     private var pendingOcr: Boolean = false
 
+    // Voicememo-state — gedeeld met Compose via StateFlow zodat de FAB van
+    // icoon kan wisselen (mic ↔ stop) en de confirm-dialog open kan klappen.
+    private val isRecording = MutableStateFlow(false)
+    private val pendingMemo = MutableStateFlow<VoiceMemoRecorder.RecordedMemo?>(null)
+    private val recorder by lazy { VoiceMemoRecorder(applicationContext) }
+
+    private val recordPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            beginRecording()
+        } else {
+            Toast.makeText(this, R.string.record_permission_denied, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     private val takePictureLauncher = registerForActivityResult(
         ActivityResultContracts.TakePicture()
     ) { success ->
@@ -185,6 +207,11 @@ class NotesListActivity : ComponentActivity() {
                     onOcrGallery = {
                         if (requireVaultOrPromptSettings()) launchPicker(withOcr = true)
                     },
+                    isRecordingFlow = isRecording.asStateFlow(),
+                    pendingMemoFlow = pendingMemo.asStateFlow(),
+                    onToggleRecord = { handleRecordToggle() },
+                    onSaveMemo = { memo -> saveMemo(memo) },
+                    onDiscardMemo = { discardPendingMemo() },
                     onOpenNote = { note ->
                         startActivity(EditorActivity.openNoteIntent(this, note.uri))
                     },
@@ -301,6 +328,86 @@ class NotesListActivity : ComponentActivity() {
         }
     }
 
+    private fun handleRecordToggle() {
+        if (!requireVaultOrPromptSettings()) return
+        if (isRecording.value) {
+            stopAndShowConfirm()
+            return
+        }
+        if (pendingMemo.value != null) return // confirm-dialog staat al open
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            beginRecording()
+        } else {
+            recordPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+
+    private fun beginRecording() {
+        recorder.start().onSuccess {
+            isRecording.value = true
+        }.onFailure { err ->
+            Toast.makeText(
+                this,
+                getString(R.string.record_start_failed, err.message ?: err.javaClass.simpleName),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    private fun stopAndShowConfirm() {
+        isRecording.value = false
+        recorder.stopAndFinalize().onSuccess { memo ->
+            pendingMemo.value = memo
+        }.onFailure { err ->
+            Toast.makeText(
+                this,
+                getString(R.string.record_too_short, err.message ?: err.javaClass.simpleName),
+                Toast.LENGTH_SHORT,
+            ).show()
+        }
+    }
+
+    private fun saveMemo(memo: VoiceMemoRecorder.RecordedMemo) {
+        pendingMemo.value = null
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                Storage.saveVoiceMemoNote(this@NotesListActivity, memo.file, memo.durationMs)
+            }
+            result.onSuccess { filename ->
+                Toast.makeText(
+                    this@NotesListActivity,
+                    getString(R.string.toast_saved, filename),
+                    Toast.LENGTH_SHORT,
+                ).show()
+                reload()
+            }.onFailure { err ->
+                memo.file.delete()
+                Toast.makeText(
+                    this@NotesListActivity,
+                    getString(R.string.toast_error, err.message ?: "onbekende fout"),
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    private fun discardPendingMemo() {
+        pendingMemo.value?.file?.delete()
+        pendingMemo.value = null
+    }
+
+    override fun onStop() {
+        // Veilig opruimen als gebruiker tijdens opname de app verlaat — voorkomt
+        // dat de mic vast blijft staan voor andere apps.
+        if (isRecording.value) {
+            recorder.discard()
+            isRecording.value = false
+        }
+        super.onStop()
+    }
+
     private fun togglePin(note: NoteSummary) {
         lifecycleScope.launch {
             val newMeta = note.meta.copy(pinned = !note.meta.pinned)
@@ -340,9 +447,16 @@ private fun NotesListScreen(
     onPickPhoto: () -> Unit,
     onOcrCamera: () -> Unit,
     onOcrGallery: () -> Unit,
+    isRecordingFlow: StateFlow<Boolean>,
+    pendingMemoFlow: StateFlow<VoiceMemoRecorder.RecordedMemo?>,
+    onToggleRecord: () -> Unit,
+    onSaveMemo: (VoiceMemoRecorder.RecordedMemo) -> Unit,
+    onDiscardMemo: () -> Unit,
     onOpenNote: (NoteSummary) -> Unit,
     onTogglePin: (NoteSummary) -> Unit,
 ) {
+    val isRecording by isRecordingFlow.collectAsState()
+    val pendingMemo by pendingMemoFlow.collectAsState()
     val state by stateFlow.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
@@ -479,6 +593,30 @@ private fun NotesListScreen(
         },
         floatingActionButton = {
             Column(horizontalAlignment = Alignment.End) {
+                // Voicememo-knop bovenaan de stack. Tijdens opname switcht het
+                // icoon naar Stop + krijgt een rode container — vormverschil
+                // (mic ↔ stop) is de primaire feedback, niet alleen kleur.
+                SmallFloatingActionButton(
+                    onClick = onToggleRecord,
+                    containerColor = if (isRecording) {
+                        MaterialTheme.colorScheme.errorContainer
+                    } else {
+                        MaterialTheme.colorScheme.secondaryContainer
+                    },
+                    contentColor = if (isRecording) {
+                        MaterialTheme.colorScheme.onErrorContainer
+                    } else {
+                        MaterialTheme.colorScheme.onSecondaryContainer
+                    },
+                ) {
+                    Icon(
+                        imageVector = if (isRecording) Icons.Filled.Stop else Icons.Filled.Mic,
+                        contentDescription = stringResource(
+                            if (isRecording) R.string.action_stop_recording else R.string.action_start_recording
+                        ),
+                    )
+                }
+                Spacer(Modifier.height(12.dp))
                 var photoMenuExpanded by remember { mutableStateOf(false) }
                 Box {
                     SmallFloatingActionButton(onClick = { photoMenuExpanded = true }) {
@@ -670,7 +808,31 @@ private fun NotesListScreen(
             },
         )
     }
+
+    pendingMemo?.let { memo ->
+        val durationLabel = formatMemoDuration(memo.durationMs)
+        AlertDialog(
+            onDismissRequest = onDiscardMemo,
+            title = { Text(stringResource(R.string.record_confirm_title)) },
+            text = { Text(stringResource(R.string.record_confirm_message, durationLabel)) },
+            confirmButton = {
+                TextButton(onClick = { onSaveMemo(memo) }) {
+                    Text(stringResource(R.string.action_save))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDiscardMemo) {
+                    Text(stringResource(R.string.action_cancel))
+                }
+            },
+        )
     }
+    }
+}
+
+private fun formatMemoDuration(ms: Long): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    return "%d:%02d".format(totalSec / 60, totalSec % 60)
 }
 
 /**
@@ -1104,6 +1266,8 @@ private fun NoteCard(
                                 else onThumbnailClick(thumbnailUri)
                             },
                     )
+                } else if (note.audioBasename != null) {
+                    VoiceMemoBanner(foreground = fg)
                 }
                 Column(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp)) {
                     Text(
@@ -1193,33 +1357,40 @@ private fun NoteCard(
     }
 }
 
+/**
+ * Visuele banner bovenaan een voicememo-kaart: equalizer-icoon op een subtiele
+ * tint van de kaartkleur. Statisch (de kaart speelt niet af), maar in één
+ * oogopslag herkenbaar als audio-notitie.
+ */
 @Composable
-private fun TagChips(tags: List<String>, foreground: Color) {
-    Box {
-        Column {
-            // Eenvoudige flow zonder externe lib: één regel chips per regel.
-            // Korte tag-lijsten passen meestal op één regel; lange wrappen naar
-            // volgende regels via Compose's default wrap-gedrag in Column.
-            val rows = chunkTagsForRow(tags)
-            for (row in rows) {
-                androidx.compose.foundation.layout.Row(
-                    horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    for (tag in row) {
-                        TagChip(tag, foreground)
-                    }
-                }
-                Spacer(Modifier.height(4.dp))
-            }
-        }
+private fun VoiceMemoBanner(foreground: Color) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(16f / 9f)
+            .background(foreground.copy(alpha = 0.10f)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = Icons.Filled.GraphicEq,
+            contentDescription = stringResource(R.string.voice_memo_card_label),
+            tint = foreground.copy(alpha = 0.85f),
+            modifier = Modifier.size(64.dp),
+        )
     }
 }
 
-private fun chunkTagsForRow(tags: List<String>): List<List<String>> {
-    // Verdeel in groepjes van max 3 zodat ze meestal op één regel passen.
-    if (tags.isEmpty()) return emptyList()
-    val perRow = 3
-    return tags.chunked(perRow)
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+@Composable
+private fun TagChips(tags: List<String>, foreground: Color) {
+    androidx.compose.foundation.layout.FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        for (tag in tags) {
+            TagChip(tag, foreground)
+        }
+    }
 }
 
 private const val LINK_CHIPS_VISIBLE = 3
@@ -1294,6 +1465,8 @@ private fun TagChip(tag: String, foreground: Color) {
             text = "#$tag",
             style = MaterialTheme.typography.labelSmall.copy(fontWeight = FontWeight.Medium),
             modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

@@ -65,6 +65,17 @@
     <string name="action_speech">Spraak naar tekst</string>
     <string name="action_checklist">Checklist-item</string>
     <string name="action_add_photo">Foto toevoegen</string>
+    <string name="action_start_recording">Voicememo opnemen</string>
+    <string name="action_stop_recording">Opname stoppen</string>
+    <string name="record_permission_denied">Toegang tot de microfoon geweigerd.</string>
+    <string name="record_start_failed">Opname kon niet starten: %1$s</string>
+    <string name="record_too_short">Opname te kort of mislukt: %1$s</string>
+    <string name="record_confirm_title">Voicememo opslaan?</string>
+    <string name="record_confirm_message">Voicememo van %1$s — opslaan als nieuwe kaart?</string>
+    <string name="audio_play">Audio afspelen</string>
+    <string name="audio_pause">Audio pauzeren</string>
+    <string name="audio_load_failed">Audio niet beschikbaar</string>
+    <string name="voice_memo_card_label">Voicememo</string>
     <string name="action_insert_photo">Foto invoegen</string>
     <string name="action_take_photo">Foto maken</string>
     <string name="action_pick_from_gallery">Kies uit galerij</string>

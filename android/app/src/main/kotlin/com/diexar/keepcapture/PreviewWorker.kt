@@ -42,7 +42,7 @@ class PreviewWorker(
         }
 
         val previewResult: kotlin.Result<OgPreview> = try {
-            OgFetcher.fetch(applicationContext, url)
+            OgFetcher.fetch(applicationContext, url, Storage.getDownloadImages(applicationContext))
         } catch (e: Throwable) {
             kotlin.Result.failure(e)
         }

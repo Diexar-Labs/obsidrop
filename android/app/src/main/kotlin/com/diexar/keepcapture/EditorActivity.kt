@@ -3,6 +3,7 @@ package com.diexar.keepcapture
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
 import android.speech.RecognizerIntent
@@ -44,6 +45,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -62,6 +65,8 @@ import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.TextFields
 import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material3.AlertDialog
@@ -88,6 +93,7 @@ import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -763,8 +769,10 @@ private fun EditorBody(
     foreground: Color,
 ) {
     val context = LocalContext.current
-    val embedUris = remember(embedBasenames) {
-        embedBasenames.mapNotNull { Storage.findAttachmentUri(context, it) }
+    val embedItems = remember(embedBasenames) {
+        embedBasenames.mapNotNull { name ->
+            Storage.findAttachmentUri(context, name)?.let { uri -> name to uri }
+        }
     }
 
     Column(
@@ -772,9 +780,10 @@ private fun EditorBody(
             .fillMaxSize()
             .padding(horizontal = 16.dp, vertical = 12.dp),
     ) {
-        if (embedUris.isNotEmpty()) {
+        if (embedItems.isNotEmpty()) {
             // Horizontaal scrollbare strip: anders eten meerdere previews het halve scherm
-            // op en kun je nauwelijks nog door de tekst scrollen.
+            // op en kun je nauwelijks nog door de tekst scrollen. Audio-embeds krijgen een
+            // play/pause-player; alle overige (image) types een thumbnail.
             val embedScroll = rememberScrollState()
             Row(
                 modifier = Modifier
@@ -782,16 +791,20 @@ private fun EditorBody(
                     .horizontalScroll(embedScroll),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                for (uri in embedUris) {
-                    AsyncImage(
-                        model = uri,
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .height(140.dp)
-                            .aspectRatio(4f / 3f)
-                            .clip(RoundedCornerShape(8.dp)),
-                    )
+                for ((name, uri) in embedItems) {
+                    if (isAudioBasename(name)) {
+                        AudioPlayerCard(uri = uri, foreground = foreground)
+                    } else {
+                        AsyncImage(
+                            model = uri,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .height(140.dp)
+                                .aspectRatio(4f / 3f)
+                                .clip(RoundedCornerShape(8.dp)),
+                        )
+                    }
                 }
             }
             Spacer(Modifier.height(8.dp))
@@ -832,7 +845,7 @@ private fun EditorBody(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 private fun TagEditor(
     tags: List<String>,
@@ -848,22 +861,17 @@ private fun TagEditor(
         input = ""
     }
 
-    Column {
-        if (tags.isNotEmpty()) {
-            val scrollState = rememberScrollState()
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(scrollState),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-            ) {
-                for (tag in tags) {
-                    EditorTagChip(tag, foreground = foreground, onRemove = { onRemove(tag) })
-                }
-            }
-            Spacer(Modifier.height(6.dp))
+    // Chips + inline input in a single FlowRow so the input always follows
+    // directly after the last chip with no extra vertical gap.
+    androidx.compose.foundation.layout.FlowRow(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        for (tag in tags) {
+            EditorTagChip(tag, foreground = foreground, onRemove = { onRemove(tag) })
         }
-        OutlinedTextField(
+        BasicTextField(
             value = input,
             onValueChange = { value ->
                 if (value.contains('\n') || value.endsWith(",") || value.endsWith(" ")) {
@@ -874,21 +882,26 @@ private fun TagEditor(
                     input = value
                 }
             },
-            modifier = Modifier.fillMaxWidth(),
-            placeholder = { Text(stringResource(R.string.tag_placeholder), color = foreground.copy(alpha = 0.5f)) },
+            modifier = Modifier
+                .defaultMinSize(minWidth = 100.dp)
+                .padding(vertical = 6.dp),
             singleLine = true,
             keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
             keyboardActions = KeyboardActions(onDone = { commit() }),
-            colors = TextFieldDefaults.colors(
-                focusedContainerColor = Color.Transparent,
-                unfocusedContainerColor = Color.Transparent,
-                focusedTextColor = foreground,
-                unfocusedTextColor = foreground,
-                cursorColor = foreground,
-                focusedIndicatorColor = foreground.copy(alpha = 0.4f),
-                unfocusedIndicatorColor = foreground.copy(alpha = 0.2f),
-            ),
-            textStyle = TextStyle(color = foreground, fontSize = MaterialTheme.typography.bodyMedium.fontSize),
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = foreground),
+            cursorBrush = androidx.compose.ui.graphics.SolidColor(foreground),
+            decorationBox = { innerTextField ->
+                Box(contentAlignment = Alignment.CenterStart) {
+                    if (input.isEmpty()) {
+                        Text(
+                            text = stringResource(R.string.tag_placeholder),
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = foreground.copy(alpha = 0.5f),
+                        )
+                    }
+                    innerTextField()
+                }
+            },
         )
     }
 }
@@ -1192,6 +1205,114 @@ internal fun combineBodyAndEmbeds(bodyText: String, embedLines: List<String>): S
 internal fun extractEmbedBasename(embedLine: String): String? {
     val m = Regex("!\\[\\[([^\\]]+)]]").find(embedLine) ?: return null
     return m.groupValues[1].trim().substringBefore("|").trim().takeIf { it.isNotEmpty() }
+}
+
+private val AUDIO_EXTENSIONS = setOf("m4a", "mp3", "wav", "ogg", "aac", "flac", "3gp", "amr")
+
+internal fun isAudioBasename(name: String): Boolean {
+    val ext = name.substringAfterLast('.', "").lowercase()
+    return ext in AUDIO_EXTENSIONS
+}
+
+/**
+ * Inline audio-player voor voicememo's in de editor. Eén toggle-knop (play/pause)
+ * + duur-label dat tijdens afspelen meebeweegt naar de huidige positie. Bewust
+ * geen seekbar — minimale UI past in de horizontale embed-strip.
+ */
+@Composable
+private fun AudioPlayerCard(uri: Uri, foreground: Color) {
+    val context = LocalContext.current
+    val player = remember(uri) { MediaPlayer() }
+    var prepared by remember(uri) { mutableStateOf(false) }
+    var playing by remember(uri) { mutableStateOf(false) }
+    var durationMs by remember(uri) { mutableStateOf(0) }
+    var positionMs by remember(uri) { mutableStateOf(0) }
+    var failed by remember(uri) { mutableStateOf(false) }
+
+    DisposableEffect(uri) {
+        try {
+            player.setDataSource(context, uri)
+            player.setOnPreparedListener {
+                prepared = true
+                durationMs = player.duration.coerceAtLeast(0)
+            }
+            player.setOnCompletionListener {
+                playing = false
+                positionMs = 0
+            }
+            player.setOnErrorListener { _, _, _ ->
+                failed = true
+                playing = false
+                true
+            }
+            player.prepareAsync()
+        } catch (_: Exception) {
+            failed = true
+        }
+        onDispose {
+            try { player.stop() } catch (_: Exception) {}
+            try { player.release() } catch (_: Exception) {}
+        }
+    }
+
+    // Tijdens afspelen elke 250ms positie verversen voor het label.
+    LaunchedEffect(playing) {
+        while (playing) {
+            positionMs = try { player.currentPosition } catch (_: Exception) { positionMs }
+            kotlinx.coroutines.delay(250)
+        }
+    }
+
+    val shownMs = if (playing || positionMs > 0) positionMs else durationMs
+    val label = formatPlayerTime(shownMs)
+
+    Surface(
+        shape = RoundedCornerShape(8.dp),
+        color = foreground.copy(alpha = 0.08f),
+        modifier = Modifier
+            .height(140.dp)
+            .width(180.dp),
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize().padding(12.dp),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            IconButton(
+                onClick = {
+                    if (failed || !prepared) return@IconButton
+                    if (playing) {
+                        try { player.pause() } catch (_: Exception) {}
+                        playing = false
+                    } else {
+                        try { player.start() } catch (_: Exception) { return@IconButton }
+                        playing = true
+                    }
+                },
+                modifier = Modifier.size(56.dp),
+            ) {
+                Icon(
+                    imageVector = if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
+                    contentDescription = stringResource(
+                        if (playing) R.string.audio_pause else R.string.audio_play
+                    ),
+                    tint = foreground,
+                    modifier = Modifier.size(40.dp),
+                )
+            }
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = if (failed) stringResource(R.string.audio_load_failed) else label,
+                color = foreground,
+                style = MaterialTheme.typography.bodySmall,
+            )
+        }
+    }
+}
+
+private fun formatPlayerTime(ms: Int): String {
+    val totalSec = (ms / 1000).coerceAtLeast(0)
+    return "%d:%02d".format(totalSec / 60, totalSec % 60)
 }
 
 /**

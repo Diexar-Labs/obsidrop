@@ -67,6 +67,17 @@
     <string name="action_speech">Speech to text</string>
     <string name="action_checklist">Checklist item</string>
     <string name="action_add_photo">Add photo</string>
+    <string name="action_start_recording">Record voice memo</string>
+    <string name="action_stop_recording">Stop recording</string>
+    <string name="record_permission_denied">Microphone permission denied.</string>
+    <string name="record_start_failed">Could not start recording: %1$s</string>
+    <string name="record_too_short">Recording too short or failed: %1$s</string>
+    <string name="record_confirm_title">Save voice memo?</string>
+    <string name="record_confirm_message">Voice memo of %1$s — save it as a new card?</string>
+    <string name="audio_play">Play audio</string>
+    <string name="audio_pause">Pause audio</string>
+    <string name="audio_load_failed">Audio unavailable</string>
+    <string name="voice_memo_card_label">Voice memo</string>
     <string name="action_insert_photo">Insert photo</string>
     <string name="action_take_photo">Take photo</string>
     <string name="action_pick_from_gallery">Pick from gallery</string>
@@ -88,6 +99,10 @@
 
     <string name="section_speech">Speech to text</string>
     <string name="speech_lang_label">Default language for voice input</string>
+
+    <string name="section_images">Article images</string>
+    <string name="download_images_label">Save article images</string>
+    <string name="download_images_hint">Download the article thumbnail when capturing a URL. Turn off to save only the title and link, without any image files.</string>
     <string name="speech_lang_hint">Works online out of the box. For offline recognition: download the language via Android settings → Languages and input → Speech recognition.</string>
 
     <string name="section_pinned">Pinned</string>

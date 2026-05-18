@@ -173,7 +173,7 @@ export class ClipServer {
     const attachmentsFolder = `${this.plugin.settings.notesFolder}/.attachments`;
     try {
       const preview = await withTimeout(
-        fetchOg(this.plugin.app, attachmentsFolder, url),
+        fetchOg(this.plugin.app, attachmentsFolder, url, this.plugin.settings.downloadImages),
         10_000,
       );
       if (preview) {

@@ -16,6 +16,7 @@ export class QuickCaptureModal extends Modal {
   plugin: ObsiDropPlugin;
   textArea!: HTMLTextAreaElement;
   private chipsEl!: HTMLElement;
+  private tagInputEl: HTMLInputElement | null = null;
   private state: {
     color: ColorName;
     tags: string[];
@@ -132,42 +133,45 @@ export class QuickCaptureModal extends Modal {
       this.state.reminder = null;
     });
 
-    // Tags
+    // Tags — chips and input share the same flex container so the input always
+    // follows directly after the last chip, even when chips wrap to a new line.
     const tagRow = bar.createDiv({ cls: "obsidrop-edit-tagrow" });
     tagRow.createSpan({ text: t("label_tags"), cls: "obsidrop-edit-label" });
     this.chipsEl = tagRow.createDiv({ cls: "obsidrop-edit-chips" });
+    this.tagInputEl = null;
     this.renderChips();
 
-    const tagInput = tagRow.createEl("input", {
+    this.tagInputEl = this.chipsEl.createEl("input", {
       cls: "obsidrop-edit-taginput",
       attr: { type: "text", placeholder: t("tag_input_placeholder") },
     });
     const datalistId = `obsidrop-tagcompletion-capture-${Date.now()}`;
     const datalist = tagRow.createEl("datalist", { attr: { id: datalistId } });
-    tagInput.setAttribute("list", datalistId);
+    this.tagInputEl.setAttribute("list", datalistId);
     for (const tag of getAllVaultTags(this.app)) {
       datalist.createEl("option", { attr: { value: tag } });
     }
     const commit = () => {
-      const value = tagInput.value.replace(/^#/, "").trim();
+      if (!this.tagInputEl) return;
+      const value = this.tagInputEl.value.replace(/^#/, "").trim();
       if (value && !this.state.tags.includes(value)) {
         this.state.tags.push(value);
         this.renderChips();
       }
-      tagInput.value = "";
+      this.tagInputEl.value = "";
     };
-    tagInput.addEventListener("keydown", (e) => {
+    this.tagInputEl.addEventListener("keydown", (e) => {
       if (e.key === "Enter" || e.key === "," || e.key === "Tab") {
-        if (tagInput.value.trim()) {
+        if (this.tagInputEl?.value.trim()) {
           e.preventDefault();
           commit();
         }
-      } else if (e.key === "Backspace" && tagInput.value === "" && this.state.tags.length > 0) {
+      } else if (e.key === "Backspace" && this.tagInputEl?.value === "" && this.state.tags.length > 0) {
         this.state.tags.pop();
         this.renderChips();
       }
     });
-    tagInput.addEventListener("blur", commit);
+    this.tagInputEl.addEventListener("blur", commit);
   }
 
   private renderChips(): void {
@@ -182,6 +186,8 @@ export class QuickCaptureModal extends Modal {
         this.renderChips();
       });
     }
+    // Keep the input at the end of the chips container after re-render.
+    if (this.tagInputEl) this.chipsEl.appendChild(this.tagInputEl);
   }
 
   private insertLinkAtCursor(linkPath: string): void {
@@ -218,7 +224,7 @@ export class QuickCaptureModal extends Modal {
         let chosenPreview: OgPreview | null = null;
         for (const candidate of urls) {
           const preview = await withTimeout(
-            fetchOg(this.app, attachmentsFolder, candidate),
+            fetchOg(this.app, attachmentsFolder, candidate, this.plugin.settings.downloadImages),
             10_000,
           );
           if (!preview) continue;
